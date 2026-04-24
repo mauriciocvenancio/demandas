@@ -9,7 +9,7 @@ if ($email === '' || $senha === '') {
 }
 
 $pdo = db();
-$stmt = $pdo->prepare("SELECT id, nome, email, senha_hash, tipo, ativo FROM usuarios WHERE email = ? LIMIT 1");
+$stmt = $pdo->prepare("SELECT id, nome, email, senha_hash, tipo, ativo, id_cliente FROM usuarios WHERE email = ? LIMIT 1");
 $stmt->execute(array($email));
 $user = $stmt->fetch();
 
@@ -30,4 +30,9 @@ $upd = $pdo->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
 $upd->execute(array($user['id']));
 
 login_user($user);
-redirect('/dashboard.php');
+
+if (!empty($user['id_cliente'])) {
+    redirect('/demandas.php');
+} else {
+    redirect('/dashboard.php');
+}

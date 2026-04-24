@@ -1,16 +1,4 @@
 <?php
-/**
- * demandas_process.php (PHP 5.6)
- * Ações:
- *  - create: cria demanda + upload anexos
- *  - update: atualiza demanda + upload anexos adicionais
- *
- * Requisitos:
- *  - includes/auth.php: require_login(), auth_user(), db()
- *  - includes/helpers.php: h() (opcional), redirect() (se não tiver, tem fallback abaixo)
- *  - Pasta uploads/demandas/ com permissão de escrita
- */
-
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/helpers.php';
 
@@ -20,7 +8,6 @@ $u   = auth_user();
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-/* ===== fallback redirect (caso não exista no helpers.php) ===== */
 if (!function_exists('redirect')) {
     function redirect($url){
         header('Location: ' . $url);
@@ -28,13 +15,11 @@ if (!function_exists('redirect')) {
     }
 }
 
-/* ===== CSRF ===== */
 $csrf = isset($_POST['csrf']) ? (string)$_POST['csrf'] : '';
 if (!isset($_SESSION['csrf']) || $csrf === '' || $csrf !== $_SESSION['csrf']) {
     redirect('/demandas.php?msg=csrf');
 }
 
-/* ===== Helpers ===== */
 function post($k){
     return isset($_POST[$k]) ? trim((string)$_POST[$k]) : '';
 }
@@ -64,9 +49,6 @@ function ensureDir($path){
     }
 }
 
-/**
- * Faz upload de múltiplos arquivos e grava em demandas_arquivos
- */
 function handleUploads($pdo, $id_demanda){
     if (!isset($_FILES['anexos']) || !isset($_FILES['anexos']['name']) || !is_array($_FILES['anexos']['name'])) {
         return;
@@ -94,14 +76,11 @@ function handleUploads($pdo, $id_demanda){
         $p = strrpos($origSafe, '.');
         if ($p !== false) $ext = strtolower(substr($origSafe, $p));
 
-        // nome físico
         $rand = bin2hex(openssl_random_pseudo_bytes(6));
         $fname = date('Ymd_His') . '_' . $rand . $ext;
-
         $dest = $uploadBase . $fname;
 
         if (@move_uploaded_file($tmp[$i], $dest)) {
-
             $mime = isset($type[$i]) ? (string)$type[$i] : null;
             $tam  = isset($size[$i]) ? (int)$size[$i] : null;
 
@@ -121,7 +100,6 @@ function handleUploads($pdo, $id_demanda){
     }
 }
 
-/* ===== parâmetros ===== */
 $action = post('action');
 
 $allowedStatus = array('nao_iniciado','em_andamento','aguardando_cliente','finalizado','publicado');
@@ -129,15 +107,22 @@ $allowedCrit   = array('baixa','media','alta','urgente');
 
 if ($action === 'create') {
 
-    $titulo      = post('titulo');
-    $descricao   = post('descricao');
-    $id_cliente  = (int)post('id_cliente');
+    $titulo    = post('titulo');
+    $descricao = post('descricao');
 
-    // responsável
-    $resp_mode   = post('resp_mode'); // "me" ou "user"
-    $id_resp     = (int)post('id_responsavel');
-    if ($resp_mode === 'me' || $id_resp <= 0) {
-        $id_resp = (int)$u['id'];
+    // trava por cliente do usuário logado
+    if (!empty($u['id_cliente'])) {
+        $id_cliente = (int)$u['id_cliente'];
+        $id_resp    = (int)$u['id'];
+    } else {
+        $id_cliente = (int)post('id_cliente');
+
+        $resp_mode = post('resp_mode');
+        $id_resp   = (int)post('id_responsavel');
+
+        if ($resp_mode === 'me' || $id_resp <= 0) {
+            $id_resp = (int)$u['id'];
+        }
     }
 
     $status      = allowedOrDefault(post('status'), $allowedStatus, 'nao_iniciado');
@@ -164,18 +149,28 @@ if ($action === 'create') {
 
     $id_demanda = (int)$pdo->lastInsertId();
 
-    // anexos
     handleUploads($pdo, $id_demanda);
 
     redirect('/demandas.php?msg=criada');
 
 } elseif ($action === 'update') {
 
-    $id          = (int)post('id');
-    $titulo      = post('titulo');
-    $descricao   = post('descricao');
-    $id_cliente  = (int)post('id_cliente');
-    $id_resp     = (int)post('id_responsavel');
+    $id        = (int)post('id');
+    $titulo    = post('titulo');
+    $descricao = post('descricao');
+
+    // trava por cliente do usuário logado
+    if (!empty($u['id_cliente'])) {
+        $id_cliente = (int)$u['id_cliente'];
+        $id_resp    = (int)$u['id'];
+    } else {
+        $id_cliente = (int)post('id_cliente');
+        $id_resp    = (int)post('id_responsavel');
+
+        if ($id_resp <= 0) {
+            $id_resp = (int)$u['id'];
+        }
+    }
 
     $status      = allowedOrDefault(post('status'), $allowedStatus, 'nao_iniciado');
     $criticidade = allowedOrDefault(post('criticidade'), $allowedCrit, 'media');
@@ -184,9 +179,7 @@ if ($action === 'create') {
     if ($id <= 0) redirect('/demandas.php?msg=id_invalido');
     if ($titulo === '') redirect('/demanda_edit.php?id='.$id.'&msg=titulo_obrigatorio');
     if ($id_cliente <= 0) redirect('/demanda_edit.php?id='.$id.'&msg=cliente_obrigatorio');
-    if ($id_resp <= 0) $id_resp = (int)$u['id'];
 
-    // confere se existe e está ativo
     $chk = $pdo->prepare("SELECT id FROM demandas WHERE id=? AND ativo=1 LIMIT 1");
     $chk->execute(array($id));
     if (!$chk->fetch()) {
@@ -210,7 +203,6 @@ if ($action === 'create') {
         $id
     ));
 
-    // anexos adicionais
     handleUploads($pdo, $id);
 
     redirect('/demanda_view.php?id=' . $id);

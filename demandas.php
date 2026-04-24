@@ -6,6 +6,7 @@ require_once __DIR__ . '/includes/layout_top.php';
 $pdo = db();
 $u = auth_user();
 
+
 // CSRF
 if (session_status() === PHP_SESSION_NONE) session_start();
 if (!isset($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(16));
@@ -15,6 +16,7 @@ $msg = isset($_GET['msg']) ? trim((string)$_GET['msg']) : '';
 $q   = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $fs  = isset($_GET['status']) ? trim((string)$_GET['status']) : '';
 $fc  = isset($_GET['crit']) ? trim((string)$_GET['crit']) : '';
+$fr  = isset($_GET['responsavel']) ? trim((string)$_GET['responsavel']) : '';
 
 function msgText($m){
     $map = array(
@@ -29,17 +31,31 @@ function msgText($m){
 $flash = msgText($msg);
 
 // combos
-$clientes = $pdo->query("SELECT id, nome FROM clientes WHERE ativo=1 ORDER BY nome ASC")->fetchAll();
+if (!empty($u['id_cliente'])) {
+    $stmtClientes = $pdo->prepare("SELECT id, nome FROM clientes WHERE ativo=1 AND id=? ORDER BY nome ASC");
+    $stmtClientes->execute(array((int)$u['id_cliente']));
+    $clientes = $stmtClientes->fetchAll();
+} else {
+    $clientes = $pdo->query("SELECT id, nome FROM clientes WHERE ativo=1 ORDER BY nome ASC")->fetchAll();
+}
 $usuarios = $pdo->query("SELECT id, nome, tipo FROM usuarios WHERE ativo=1 ORDER BY nome ASC")->fetchAll();
 
 // filtros listagem
 $where = " d.ativo=1 ";
 $params = array();
 
+if (!empty($u['id_cliente'])) {
+    $where .= " AND d.id_cliente = ? AND d.id_responsavel = ? ";
+    $params[] = (int)$u['id_cliente'];
+    $params[] = (int)$u['id'];
+}
+
 if ($q !== '') {
     $where .= " AND (d.titulo LIKE ? OR c.nome LIKE ? OR u.nome LIKE ?) ";
     $like = '%' . $q . '%';
-    $params[] = $like; $params[] = $like; $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
 }
 if ($fs !== '' && $fs !== 'all') {
     $where .= " AND d.status = ? ";
@@ -49,9 +65,13 @@ if ($fc !== '' && $fc !== 'all') {
     $where .= " AND d.criticidade = ? ";
     $params[] = $fc;
 }
+if ($fr !== '' && $fr !== 'all') {
+    $where .= " AND d.id_responsavel = ? ";
+    $params[] = $fr;
+}
 
 $sql = "
-  SELECT d.id, d.titulo, d.status, d.criticidade, d.prazo,
+  SELECT d.id, d.titulo, d.status, d.criticidade, d.prazo, d.criado_em,
          c.nome AS cliente_nome,
          u.nome AS responsavel_nome
   FROM demandas d
@@ -88,6 +108,44 @@ function brData($d){
     $t = strtotime($d);
     if (!$t) return '-';
     return date('d/m/Y', $t);
+}
+function brDatetime($d){
+    if (!$d) return '-';
+    $t = strtotime($d);
+    if (!$t) return '-';
+    return date('d/m/Y H:i', $t);
+}
+function diasPrazo($prazo, $criado_em, $status = ''){
+    $finalizado = in_array($status, array('finalizado', 'publicado'), true);
+    $hoje = strtotime(date('Y-m-d'));
+    if (!empty($prazo)) {
+        $tp   = strtotime($prazo);
+        if (!$tp) return null;
+        $diff = (int)round(($tp - $hoje) / 86400);
+        if ($diff === 0) return array('txt' => 'Hoje', 'cor' => '#16a34a', 'tip' => 'Prazo é hoje');
+        if ($finalizado) return array('txt' => '✓ Concluído', 'cor' => '#16a34a', 'tip' => 'Demanda finalizada');
+        $abs  = abs($diff);
+        $tip  = $diff > 0 ? "Faltam {$abs} dia(s)" : "Vencido há {$abs} dia(s)";
+        return array('txt' => $diff . 'd', 'cor' => '#dc2626', 'tip' => $tip);
+    }
+    if (!empty($criado_em)) {
+        if ($finalizado) return array('txt' => '✓ Concluído', 'cor' => '#16a34a', 'tip' => 'Demanda finalizada');
+        $tc  = strtotime(date('Y-m-d', strtotime($criado_em)));
+        if (!$tc) return null;
+        $dias = (int)round(($hoje - $tc) / 86400);
+        return array('txt' => $dias . 'd em aberto', 'cor' => '#9ca3af', 'tip' => "Sem prazo — {$dias} dia(s) desde a criação");
+    }
+    return null;
+}
+function diasCriacao($criado_em, $prazo){
+    if (empty($criado_em) || empty($prazo)) return null;
+    $tc = strtotime(date('Y-m-d', strtotime($criado_em)));
+    $tp = strtotime(date('Y-m-d', strtotime($prazo)));
+    if (!$tc || !$tp) return null;
+    $dias = (int)round(($tp - $tc) / 86400);
+    if ($dias === 0) return array('txt' => 'Mesmo dia', 'cor' => '#16a34a');
+    if ($dias <= 5)  return array('txt' => $dias . 'd',  'cor' => '#d97706');
+    return              array('txt' => $dias . 'd',      'cor' => '#dc2626');
 }
 ?>
 <style>
@@ -246,6 +304,17 @@ function brData($d){
                 <option value="urgente" <?= ($fc==='urgente')?'selected':''; ?>>Urgente</option>
             </select>
 
+            <?php if (empty($u['id_cliente'])): ?>
+                <select name="responsavel" onchange="this.form.submit()">
+                    <option value="all">Responsável</option>
+                    <?php foreach($usuarios as $us): ?>
+                        <option value="<?= h($us['id']) ?>" <?= $fr == $us['id'] ? 'selected' : '' ?>>
+                            <?= h($us['nome']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            <?php endif; ?>
+
             <button class="btn" type="submit">Filtrar</button>
         </form>
     </div>
@@ -254,12 +323,13 @@ function brData($d){
         <table>
             <thead>
             <tr>
-                <th style="width:26%;">Título</th>
-                <th style="width:18%;">Cliente</th>
-                <th style="width:22%;">Responsável</th>
-                <th style="width:14%;">Criticidade</th>
-                <th style="width:14%;">Status</th>
+                <th style="width:24%;">Título</th>
+                <th style="width:16%;">Cliente</th>
+                <th style="width:16%;">Responsável</th>
+                <th style="width:12%;">Criticidade</th>
+                <th style="width:12%;">Status</th>
                 <th style="width:10%;">Prazo</th>
+                <th style="width:10%;">Criação</th>
                 <th style="width:6%;"></th>
             </tr>
             </thead>
@@ -274,7 +344,15 @@ function brData($d){
                             <span class="badge badge-dark">👁 <?= h(labelCrit($d['criticidade'])) ?></span>
                         </td>
                         <td><span class="badge"><?= h(labelStatus($d['status'])) ?></span></td>
-                        <td class="td-muted"><?= h(brData($d['prazo'])) ?></td>
+                        <td class="td-muted">
+                            <?= h(brData($d['prazo'])) ?>
+                        </td>
+                        <td class="td-muted" style="font-size:12px;">
+                            <?= h(brDatetime($d['criado_em'])) ?>
+                            <?php $dc = diasCriacao($d['criado_em'], $d['prazo']); if ($dc): ?>
+                                <div style="font-size:11px;margin-top:3px;font-weight:900;color:<?= $dc['cor'] ?>;"><?= $dc['txt'] ?></div>
+                            <?php endif; ?>
+                        </td>
                         <td class="row-actions">
                             <button class="dots" type="button" onclick="toggleRowMenu(<?= (int)$d['id'] ?>)">…</button>
                             <div class="menu" id="menu-<?= (int)$d['id'] ?>">
@@ -285,7 +363,7 @@ function brData($d){
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>
-                <tr><td colspan="7" class="td-muted" style="padding:18px;">Nenhuma demanda encontrada.</td></tr>
+                <tr><td colspan="8" class="td-muted" style="padding:18px;">Nenhuma demanda encontrada.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
@@ -318,29 +396,44 @@ function brData($d){
                 <div class="grid">
                     <div>
                         <label>Cliente <span class="req">*</span></label>
-                        <select name="id_cliente" required>
-                            <option value="">Selecione o cliente</option>
-                            <?php foreach ($clientes as $c): ?>
-                                <option value="<?= (int)$c['id'] ?>"><?= h($c['nome']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
+
+                        <?php if (!empty($u['id_cliente']) && !empty($clientes)): ?>
+                            <input type="hidden" name="id_cliente" value="<?= (int)$u['id_cliente'] ?>">
+                            <input type="text" value="<?= h($clientes[0]['nome']) ?>" disabled>
+                        <?php else: ?>
+                            <select name="id_cliente" required>
+                                <option value="">Selecione o cliente</option>
+                                <?php foreach ($clientes as $c): ?>
+                                    <option value="<?= (int)$c['id'] ?>"><?= h($c['nome']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php endif; ?>
                     </div>
 
                     <div>
-                        <label>Responsável</label>
-                        <select name="resp_mode" onchange="toggleResp(this.value)">
-                            <option value="me" selected>Eu mesmo</option>
-                            <option value="user">Selecionar usuário</option>
-                        </select>
+                        <label>Responsável <span class="req">*</span></label>
 
-                        <div style="margin-top:10px; display:none;" id="resp_user_box">
-                            <select name="id_responsavel">
-                                <option value="">Selecione o usuário</option>
-                                <?php foreach ($usuarios as $us): ?>
-                                    <option value="<?= (int)$us['id'] ?>"><?= h($us['nome']) ?> (<?= h($us['tipo']) ?>)</option>
-                                <?php endforeach; ?>
+                        <?php if (!empty($u['id_cliente'])): ?>
+                            <input type="hidden" name="resp_mode" value="me">
+                            <input type="hidden" name="id_responsavel" value="<?= (int)$u['id'] ?>">
+                            <input type="text" value="<?= h($u['nome']) ?>" disabled>
+                        <?php else: ?>
+                            <select name="resp_mode" onchange="toggleResp(this.value)">
+                                <option value="me" selected>Eu mesmo</option>
+                                <option value="user">Selecionar usuário</option>
                             </select>
-                        </div>
+
+                            <div style="margin-top:10px; display:none;" id="resp_user_box">
+                                <select name="id_responsavel">
+                                    <option value="">Selecione o usuário</option>
+                                    <?php foreach ($usuarios as $us): ?>
+                                        <option value="<?= (int)$us['id'] ?>">
+                                            <?= h($us['nome']) ?> (<?= h($us['tipo']) ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -403,7 +496,6 @@ function brData($d){
         </form>
     </div>
 </div>
-
 <script>
     function openModal(id){
         document.getElementById(id).style.display = 'flex';

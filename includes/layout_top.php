@@ -240,11 +240,19 @@ function menuItem($key, $label, $href, $icon, $activeKey){
         <nav class="nav">
             <div class="nav-title">Menu</div>
             <?php
-            menuItem('dashboard', 'Dashboard', 'dashboard.php', '▦', $menuActive);
-            menuItem('clientes',   'Clientes',   'clientes.php',   '👥', $menuActive);
-            menuItem('demandas',   'Demandas',   'demandas.php',   '📋', $menuActive);
-            menuItem('suportes',   'Suportes',   'suportes.php',   '🎧', $menuActive);
-            menuItem('relatorios', 'Relatórios', 'relatorios.php', '📊', $menuActive);
+            if (!empty($u['id_cliente'])) {
+                // usuário vinculado a um cliente: vê apenas demandas
+                menuItem('demandas',      'Demandas',        'demandas.php',       '📋', $menuActive);
+            } else {
+                // usuário interno/admin: vê tudo
+                menuItem('dashboard',     'Dashboard',       'dashboard.php',      '▦',  $menuActive);
+                menuItem('clientes',      'Clientes',        'clientes.php',       '👥', $menuActive);
+                menuItem('demandas',      'Demandas',        'demandas.php',       '📋', $menuActive);
+                menuItem('suportes',      'Suportes',        'suportes.php',       '🎧', $menuActive);
+                menuItem('relatorios',    'Relatórios',      'relatorios.php',     '📊', $menuActive);
+                menuItem('fila_demandas', 'Fila de Demandas','fila_demandas.php',  '📌', $menuActive);
+                menuItem('graficos',      'Gráficos',         'graficos.php',        '📈', $menuActive);
+            }
             ?>
         </nav>
 

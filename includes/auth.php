@@ -21,7 +21,8 @@ function login_user($userRow){
         'id' => (int)$userRow['id'],
         'nome' => $userRow['nome'],
         'email' => $userRow['email'],
-        'tipo' => $userRow['tipo']
+        'tipo' => $userRow['tipo'],
+        'id_cliente' => $userRow['id_cliente']
     );
 }
 

@@ -23,7 +23,7 @@ if (!validDate($data_fim)) $data_fim = date('Y-m-d');
 $allowedStatus = array('nao_iniciado','em_andamento','aguardando_resposta_cliente','finalizado','publicado');
 $allowedCrit   = array('baixa','media','alta','urgente');
 
-$where  = array("d.ativo=1", "DATE(d.criado_em) >= ?", "DATE(d.criado_em) <= ?");
+$where  = array("d.ativo=1", "DATE(d.prazo) >= ?", "DATE(d.prazo) <= ?");
 $params = array($data_ini, $data_fim);
 
 if ($id_cliente > 0) { $where[] = "d.id_cliente=?"; $params[] = $id_cliente; }
@@ -54,6 +54,72 @@ $stR = $pdo->prepare($sqlResumo);
 $stR->execute($params);
 $resumo = $stR->fetch();
 
+/* ===== Card separado: Em andamento (sem considerar data) ===== */
+$whereAndamento = array("d.ativo=1", "d.status='em_andamento'");
+$paramsAndamento = array();
+
+if ($id_cliente > 0) {
+    $whereAndamento[] = "d.id_cliente=?";
+    $paramsAndamento[] = $id_cliente;
+}
+
+if ($id_usuario > 0) {
+    $whereAndamento[] = "d.id_responsavel=?";
+    $paramsAndamento[] = $id_usuario;
+}
+
+if ($criticidade !== 'todos' && in_array($criticidade, $allowedCrit, true)) {
+    $whereAndamento[] = "d.criticidade=?";
+    $paramsAndamento[] = $criticidade;
+}
+
+/* ===== Card separado: Não iniciado (sem considerar data) ===== */
+$whereNaoIniciado = array("d.ativo=1", "d.status='nao_iniciado'");
+$paramsNaoIniciado = array();
+
+if ($id_cliente > 0) {
+    $whereNaoIniciado[] = "d.id_cliente=?";
+    $paramsNaoIniciado[] = $id_cliente;
+}
+
+if ($id_usuario > 0) {
+    $whereNaoIniciado[] = "d.id_responsavel=?";
+    $paramsNaoIniciado[] = $id_usuario;
+}
+
+if ($criticidade !== 'todos' && in_array($criticidade, $allowedCrit, true)) {
+    $whereNaoIniciado[] = "d.criticidade=?";
+    $paramsNaoIniciado[] = $criticidade;
+}
+
+$qtdTotalAjustado =
+    (int)$qtdNaoIniciadoTotal +
+    (int)$qtdEmAndamentoTotal +
+    (int)$resumo['aguardando_resposta'] +
+    (int)$resumo['finalizado'];
+
+$stNI = $pdo->prepare("
+    SELECT COUNT(*) 
+    FROM demandas d
+    WHERE ".implode(" AND ", $whereNaoIniciado)."
+");
+$stNI->execute($paramsNaoIniciado);
+$qtdNaoIniciadoTotal = (int)$stNI->fetchColumn();
+
+$stEA = $pdo->prepare("
+    SELECT COUNT(*) 
+    FROM demandas d
+    WHERE ".implode(" AND ", $whereAndamento)."
+");
+$stEA->execute($paramsAndamento);
+$qtdEmAndamentoTotal = (int)$stEA->fetchColumn();
+
+
+$qtdTotalAjustado =
+    (int)$qtdNaoIniciadoTotal +
+    (int)$qtdEmAndamentoTotal +
+    (int)$resumo['aguardando_resposta'] +
+    (int)$resumo['finalizado'];
 /* ===== Lista detalhada ===== */
 $sql = "
 SELECT
@@ -89,12 +155,34 @@ function labelCrit($c){
     $map = array('baixa'=>'Baixa','media'=>'Média','alta'=>'Alta','urgente'=>'Urgente');
     return isset($map[$c]) ? $map[$c] : $c;
 }
+function diasCriacaoRel($criado_em, $prazo){
+    if (empty($criado_em) || empty($prazo)) return null;
+    $tc = strtotime(date('Y-m-d', strtotime($criado_em)));
+    $tp = strtotime(date('Y-m-d', strtotime($prazo)));
+    if (!$tc || !$tp) return null;
+    $dias = (int)round(($tp - $tc) / 86400);
+    if ($dias === 0) return array('txt' => 'Mesmo dia', 'cor' => '#16a34a');
+    if ($dias <= 5)  return array('txt' => $dias . 'd',  'cor' => '#d97706');
+    return              array('txt' => $dias . 'd',      'cor' => '#dc2626');
+}
 
 $menuActive = 'relatorios';
 $pageTitle  = 'Relatório de Demandas';
 require_once __DIR__ . '/includes/layout_top.php';
 
 $csvUrl = 'relatorio_demandas_csv.php?' . http_build_query($_GET);
+
+$hoje = date('Y-m-d');
+
+$stmt = $pdo->prepare("
+    SELECT COUNT(*) 
+    FROM demandas
+    WHERE ativo = 1
+      AND status = 'finalizado'
+      AND DATE(prazo) = ?
+");
+$stmt->execute(array($hoje));
+$qtdFinalizadasHoje = (int)$stmt->fetchColumn();
 ?>
 
 <style>
@@ -202,12 +290,12 @@ $csvUrl = 'relatorio_demandas_csv.php?' . http_build_query($_GET);
 </form>
 
 <div class="cards">
-    <div class="card"><div class="k">Total</div><div class="v"><?= (int)$resumo['total'] ?></div></div>
-    <div class="card"><div class="k">Não iniciado</div><div class="v"><?= (int)$resumo['nao_iniciado'] ?></div></div>
-    <div class="card"><div class="k">Em andamento</div><div class="v"><?= (int)$resumo['em_andamento'] ?></div></div>
+    <div class="card"><div class="k">Total</div><div class="v"><?= (int)$qtdTotalAjustado ?></div></div>
+    <div class="card"><div class="k">Não iniciado</div><div class="v"><?= (int)$qtdNaoIniciadoTotal ?></div></div>
+    <div class="card"><div class="k">Em andamento</div><div class="v"><?= (int)$qtdEmAndamentoTotal ?></div></div>
     <div class="card"><div class="k">Aguardando resposta</div><div class="v"><?= (int)$resumo['aguardando_resposta'] ?></div></div>
-    <div class="card"><div class="k">Finalizado</div><div class="v"><?= (int)$resumo['finalizado'] ?></div></div>
-    <div class="card"><div class="k">Publicado</div><div class="v"><?= (int)$resumo['publicado'] ?></div></div>
+    <div class="card"><div class="k">Finalizado Total</div><div class="v"><?= (int)$resumo['finalizado'] ?></div></div>
+    <div class="card"><div class="k">Finalizadas Hoje</div><div class="v"><?= (int)$qtdFinalizadasHoje ?></div></div>
 </div>
 
 <div class="panel">
@@ -220,7 +308,7 @@ $csvUrl = 'relatorio_demandas_csv.php?' . http_build_query($_GET);
         <table>
             <thead>
             <tr>
-                <th>Data</th>
+                <th>Criação</th>
                 <th>Título</th>
                 <th>Cliente</th>
                 <th>Responsável</th>
@@ -233,7 +321,12 @@ $csvUrl = 'relatorio_demandas_csv.php?' . http_build_query($_GET);
             <tbody>
             <?php foreach ($linhas as $r): ?>
                 <tr>
-                    <td><?= h(date('d/m/Y', strtotime($r['criado_em']))) ?></td>
+                    <td style="font-size:12px;">
+                        <?= h(date('d/m/Y H:i', strtotime($r['criado_em']))) ?>
+                        <?php $dc = diasCriacaoRel($r['criado_em'], $r['prazo']); if ($dc): ?>
+                            <div style="font-size:11px;margin-top:3px;font-weight:900;color:<?= $dc['cor'] ?>;"><?= $dc['txt'] ?></div>
+                        <?php endif; ?>
+                    </td>
                     <td><?= h($r['titulo']) ?></td>
                     <td><?= h($r['cliente_nome']) ?></td>
                     <td><?= h($r['responsavel_nome']) ?></td>

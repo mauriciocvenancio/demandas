@@ -12,6 +12,7 @@ $csrf = $_SESSION['csrf'];
 
 $q    = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $tipo = isset($_GET['tipo']) ? trim((string)$_GET['tipo']) : 'todos';
+$resp = isset($_GET['resp']) ? (int)$_GET['resp'] : 0; // 0 = todos
 
 $where = array("s.ativo=1");
 $params = array();
@@ -26,6 +27,11 @@ $allowedTipos = array('melhoria','duvida','solicitacao','bug','configuracao');
 if ($tipo !== 'todos' && in_array($tipo, $allowedTipos, true)) {
     $where[] = "s.tipo_contato = ?";
     $params[] = $tipo;
+}
+
+if ($resp > 0) {
+    $where[]  = "s.id_usuario_responsavel = ?";
+    $params[] = $resp;
 }
 
 $sql = "
@@ -169,6 +175,15 @@ require_once __DIR__ . '/includes/layout_top.php';
                 <option value="solicitacao" <?= ($tipo==='solicitacao')?'selected':''; ?>>Solicitação</option>
                 <option value="bug" <?= ($tipo==='bug')?'selected':''; ?>>Bug</option>
                 <option value="configuracao" <?= ($tipo==='configuracao')?'selected':''; ?>>Configuração</option>
+            </select>
+
+            <select class="select" name="resp">
+                <option value="0" <?= ($resp===0)?'selected':''; ?>>Todos Responsáveis</option>
+                <?php foreach ($usuarios as $us): ?>
+                    <option value="<?= (int)$us['id'] ?>" <?= ($resp===(int)$us['id'])?'selected':''; ?>>
+                        <?= h($us['nome']) ?> (<?= h($us['tipo']) ?>)
+                    </option>
+                <?php endforeach; ?>
             </select>
             <button class="btn" type="submit">Filtrar</button>
         </form>
