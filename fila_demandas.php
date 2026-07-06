@@ -9,6 +9,26 @@ $u   = auth_user();
 $q      = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $status = isset($_GET['status']) ? trim((string)$_GET['status']) : 'todos';
 $crit   = isset($_GET['crit']) ? trim((string)$_GET['crit']) : 'todos';
+$ftipo  = isset($_GET['tipo']) ? trim((string)$_GET['tipo']) : '';
+
+$allowedTipos = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas','sem_tipo');
+
+// contagem por tipo para os cards
+$stmtCards = $pdo->prepare("
+    SELECT
+        CASE WHEN tipo_demanda IS NULL OR tipo_demanda = '' THEN 'sem_tipo' ELSE tipo_demanda END AS tipo,
+        COUNT(*) AS total
+    FROM demandas
+    WHERE ativo=1
+      AND id_responsavel = ?
+      AND status NOT IN ('finalizado','publicado')
+    GROUP BY tipo
+");
+$stmtCards->execute(array((int)$u['id']));
+$contagensTipo = array();
+foreach ($stmtCards->fetchAll() as $row) {
+    $contagensTipo[$row['tipo']] = (int)$row['total'];
+}
 
 $where  = array("d.ativo=1", "d.id_responsavel = ?");
 $params = array((int)$u['id']);
@@ -31,6 +51,19 @@ if ($crit !== 'todos' && in_array($crit, $allowedCrit, true)) {
     $params[] = $crit;
 }
 
+if ($ftipo !== '' && in_array($ftipo, $allowedTipos, true)) {
+    if ($ftipo === 'sem_tipo') {
+        $where[] = "(d.tipo_demanda IS NULL OR d.tipo_demanda = '')";
+    } else {
+        $where[] = "d.tipo_demanda = ?";
+        $params[] = $ftipo;
+    }
+}
+
+$orderBy = ($ftipo !== '' && in_array($ftipo, $allowedTipos, true))
+    ? "d.criado_em ASC"
+    : "CASE d.criticidade WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 WHEN 'baixa' THEN 4 ELSE 5 END, d.id DESC";
+
 $sql = "
 SELECT d.id,
        d.titulo,
@@ -38,6 +71,7 @@ SELECT d.id,
        d.criticidade,
        d.prazo,
        d.criado_em,
+       d.tipo_demanda,
        c.nome AS cliente_nome,
        u2.nome AS responsavel_nome
 FROM demandas d
@@ -45,21 +79,23 @@ JOIN clientes c ON c.id = d.id_cliente
 JOIN usuarios u2 ON u2.id = d.id_responsavel
 WHERE (d.status <> 'finalizado' OR d.status IS NULL)
   AND ".implode(" AND ", $where)."
-ORDER BY 
-  CASE d.criticidade
-    WHEN 'urgente' THEN 1
-    WHEN 'alta'    THEN 2
-    WHEN 'media'   THEN 3
-    WHEN 'baixa'   THEN 4
-    ELSE 5
-  END,
-  d.id DESC
+ORDER BY $orderBy
 LIMIT 300
 ";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $linhas = $stmt->fetchAll();
 
+function labelTipoDem($t){
+    $map = array(
+        'bug'                  => 'Bug',
+        'solicitacao_novo_item'=> 'Solicitação novo item ou melhoria',
+        'uso_incorreto'        => 'Uso incorreto do Cliente',
+        'orientacoes_duvidas'  => 'Orientações e Dúvidas',
+        'sem_tipo'             => 'Sem Tipo',
+    );
+    return isset($map[$t]) ? $map[$t] : $t;
+}
 function labelStatusDem($s){
     $map = array(
         'nao_iniciado'=>'Não Iniciado',
@@ -151,6 +187,22 @@ require_once __DIR__ . '/includes/layout_top.php';
         }
         .menu-panel button:hover{background:#f6f6f6;}
         .empty{padding:46px 10px;text-align:center;color:var(--muted);font-weight:900;}
+
+        /* cards de tipo */
+        .tipo-cards{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
+        .tipo-card{
+            flex:1;min-width:160px;
+            border:2px solid var(--line);border-radius:16px;
+            padding:16px 18px;background:#fff;cursor:pointer;
+            text-decoration:none;color:inherit;
+            transition:border-color .15s, box-shadow .15s;
+        }
+        .tipo-card:hover{border-color:#111;box-shadow:0 4px 16px rgba(0,0,0,.08);}
+        .tipo-card.ativo{border-color:#111;background:#111;color:#fff;}
+        .tipo-card .tc-num{font-size:28px;font-weight:900;line-height:1;}
+        .tipo-card .tc-lbl{font-size:12px;font-weight:800;margin-top:6px;opacity:.75;}
+        .tipo-card.ativo .tc-lbl{opacity:.85;}
+        .tipo-card .tc-clear{font-size:11px;font-weight:700;margin-top:6px;text-decoration:underline;opacity:.6;}
     </style>
 
     <div class="toprow">
@@ -159,6 +211,33 @@ require_once __DIR__ . '/includes/layout_top.php';
             <div class="sub">Tudo que está atribuído a você como responsável</div>
         </div>
     </div>
+
+    <?php
+    $tiposOrdem = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas','sem_tipo');
+    $totalCards = 0;
+    foreach ($tiposOrdem as $t) { $totalCards += isset($contagensTipo[$t]) ? $contagensTipo[$t] : 0; }
+    ?>
+    <?php if ($totalCards > 0): ?>
+    <div class="tipo-cards">
+        <?php foreach ($tiposOrdem as $t):
+            $cnt = isset($contagensTipo[$t]) ? $contagensTipo[$t] : 0;
+            if ($cnt === 0) continue;
+            $ativo = ($ftipo === $t);
+            $url   = '?' . http_build_query(array_merge(
+                array('q'=>$q,'status'=>$status,'crit'=>$crit),
+                $ativo ? array() : array('tipo'=>$t)
+            ));
+        ?>
+        <a href="<?= h($url) ?>" class="tipo-card <?= $ativo ? 'ativo' : '' ?>">
+            <div class="tc-num"><?= $cnt ?></div>
+            <div class="tc-lbl"><?= h(labelTipoDem($t)) ?></div>
+            <?php if ($ativo): ?>
+                <div class="tc-clear">Clique para remover filtro</div>
+            <?php endif; ?>
+        </a>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 
     <div class="panel">
         <div class="toolbar">
@@ -186,13 +265,21 @@ require_once __DIR__ . '/includes/layout_top.php';
             </form>
         </div>
 
-        <div style="font-weight:900;font-size:15px;margin-bottom:10px;">Minhas Demandas</div>
+        <div style="font-weight:900;font-size:15px;margin-bottom:10px;">
+            Minhas Demandas
+            <?php if ($ftipo !== '' && in_array($ftipo, $allowedTipos, true)): ?>
+                <span style="font-size:12px;font-weight:700;color:var(--muted);margin-left:8px;">
+                    — <?= h(labelTipoDem($ftipo)) ?> · do mais antigo ao mais novo
+                </span>
+            <?php endif; ?>
+        </div>
 
         <?php if (!empty($linhas)): ?>
             <table>
                 <thead>
                 <tr>
                     <th>Título</th>
+                    <th>Tipo</th>
                     <th>Cliente</th>
                     <th>Responsável</th>
                     <th>Criticidade</th>
@@ -206,6 +293,13 @@ require_once __DIR__ . '/includes/layout_top.php';
                 <?php foreach ($linhas as $r): ?>
                     <tr>
                         <td><?= h($r['titulo']) ?></td>
+                        <td style="font-size:12px;">
+                            <?php if (!empty($r['tipo_demanda'])): ?>
+                                <span class="badge"><?= h(labelTipoDem($r['tipo_demanda'])) ?></span>
+                            <?php else: ?>
+                                <span style="color:var(--muted);font-weight:700;">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= h($r['cliente_nome']) ?></td>
                         <td><?= h($r['responsavel_nome']) ?></td>
                         <td><span class="badge badge-dark"><?= h(labelCritDem($r['criticidade'])) ?></span></td>
