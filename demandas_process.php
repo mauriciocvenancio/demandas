@@ -104,7 +104,7 @@ $action = post('action');
 
 $allowedStatus = array('nao_iniciado','em_andamento','aguardando_cliente','finalizado','publicado');
 $allowedCrit   = array('baixa','media','alta','urgente');
-$allowedTipo   = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas');
+$allowedTipo   = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas','desenvolvimento');
 
 if ($action === 'create') {
 

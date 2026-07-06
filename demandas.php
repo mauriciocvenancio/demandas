@@ -477,6 +477,7 @@ function diasCriacao($criado_em, $prazo){
                             <option value="solicitacao_novo_item">Solicitação novo item ou melhoria</option>
                             <option value="uso_incorreto">Uso incorreto do Cliente</option>
                             <option value="orientacoes_duvidas">Orientações e Dúvidas</option>
+                            <option value="desenvolvimento">Desenvolvimento</option>
                         </select>
                     </div>
                     <div id="solicitante_create" style="display:none;">

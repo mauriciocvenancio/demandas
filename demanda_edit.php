@@ -179,13 +179,14 @@ function isImageExt($filename){
         <div class="grid">
             <div>
                 <label>Tipo</label>
-                <select name="tipo_demanda" id="tipo_demanda_edit" onchange="toggleSolicitante(this,'solicitante_edit')">
+                        <select name="tipo_demanda" id="tipo_demanda_edit" onchange="toggleSolicitante(this,'solicitante_edit')">
                     <option value="">Selecione o tipo</option>
                     <option value="bug" <?= ($demanda['tipo_demanda']==='bug')?'selected':''; ?>>Bug</option>
                     <option value="solicitacao_novo_item" <?= ($demanda['tipo_demanda']==='solicitacao_novo_item')?'selected':''; ?>>Solicitação novo item ou melhoria</option>
                     <option value="uso_incorreto" <?= ($demanda['tipo_demanda']==='uso_incorreto')?'selected':''; ?>>Uso incorreto do Cliente</option>
                     <option value="orientacoes_duvidas" <?= ($demanda['tipo_demanda']==='orientacoes_duvidas')?'selected':''; ?>>Orientações e Dúvidas</option>
-                </select>
+                    <option value="desenvolvimento" <?= ($demanda['tipo_demanda']==='desenvolvimento')?'selected':''; ?>>Desenvolvimento</option>
+                        </select>
             </div>
             <div id="solicitante_edit" style="display:<?= ($demanda['tipo_demanda']==='solicitacao_novo_item')?'block':'none'; ?>;">
                 <label>Nome do Solicitante</label>

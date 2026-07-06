@@ -11,7 +11,7 @@ $status = isset($_GET['status']) ? trim((string)$_GET['status']) : 'todos';
 $crit   = isset($_GET['crit']) ? trim((string)$_GET['crit']) : 'todos';
 $ftipo  = isset($_GET['tipo']) ? trim((string)$_GET['tipo']) : '';
 
-$allowedTipos = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas','sem_tipo');
+$allowedTipos = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas','desenvolvimento','sem_tipo');
 
 // contagem por tipo para os cards
 $stmtCards = $pdo->prepare("
@@ -92,6 +92,7 @@ function labelTipoDem($t){
         'solicitacao_novo_item'=> 'Solicitação novo item ou melhoria',
         'uso_incorreto'        => 'Uso incorreto do Cliente',
         'orientacoes_duvidas'  => 'Orientações e Dúvidas',
+        'desenvolvimento'      => 'Desenvolvimento',
         'sem_tipo'             => 'Sem Tipo',
     );
     return isset($map[$t]) ? $map[$t] : $t;
@@ -213,7 +214,7 @@ require_once __DIR__ . '/includes/layout_top.php';
     </div>
 
     <?php
-    $tiposOrdem = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas','sem_tipo');
+    $tiposOrdem = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas','desenvolvimento','sem_tipo');
     $totalCards = 0;
     foreach ($tiposOrdem as $t) { $totalCards += isset($contagensTipo[$t]) ? $contagensTipo[$t] : 0; }
     ?>
