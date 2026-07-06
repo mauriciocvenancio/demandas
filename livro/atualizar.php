@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'auth.php';
 
 $id   = isset($_POST['id']) ? (int)$_POST['id'] : 0;
 $data = isset($_POST['data_lancamento']) ? $_POST['data_lancamento'] : '';

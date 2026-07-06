@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'auth.php';
 
 $data_ini = isset($_GET['data_ini']) && $_GET['data_ini'] ? $_GET['data_ini'] : date('Y-m-01');
 $data_fim = isset($_GET['data_fim']) && $_GET['data_fim'] ? $_GET['data_fim'] : date('Y-m-d');

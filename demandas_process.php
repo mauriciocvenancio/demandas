@@ -104,6 +104,7 @@ $action = post('action');
 
 $allowedStatus = array('nao_iniciado','em_andamento','aguardando_cliente','finalizado','publicado');
 $allowedCrit   = array('baixa','media','alta','urgente');
+$allowedTipo   = array('bug','solicitacao_novo_item','uso_incorreto','orientacoes_duvidas');
 
 if ($action === 'create') {
 
@@ -125,17 +126,21 @@ if ($action === 'create') {
         }
     }
 
-    $status      = allowedOrDefault(post('status'), $allowedStatus, 'nao_iniciado');
-    $criticidade = allowedOrDefault(post('criticidade'), $allowedCrit, 'media');
-    $prazoDb     = normalizeDate(post('prazo'));
+    $status          = allowedOrDefault(post('status'), $allowedStatus, 'nao_iniciado');
+    $criticidade     = allowedOrDefault(post('criticidade'), $allowedCrit, 'media');
+    $prazoDb         = normalizeDate(post('prazo'));
+    $tipo_demanda    = allowedOrDefault(post('tipo_demanda'), $allowedTipo, null);
+    if (!in_array($tipo_demanda, $allowedTipo, true)) $tipo_demanda = null;
+    $nome_solicitante = ($tipo_demanda === 'solicitacao_novo_item' && post('nome_solicitante') !== '')
+                        ? post('nome_solicitante') : null;
 
     if ($titulo === '') redirect('/demandas.php?msg=titulo_obrigatorio');
     if ($id_cliente <= 0) redirect('/demandas.php?msg=cliente_obrigatorio');
 
     $stmt = $pdo->prepare("
         INSERT INTO demandas
-        (titulo, descricao, id_cliente, id_responsavel, status, criticidade, prazo, ativo, criado_em)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())
+        (titulo, descricao, id_cliente, id_responsavel, status, criticidade, prazo, tipo_demanda, nome_solicitante, ativo, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
     ");
     $stmt->execute(array(
         $titulo,
@@ -144,7 +149,9 @@ if ($action === 'create') {
         $id_resp,
         $status,
         $criticidade,
-        $prazoDb
+        $prazoDb,
+        $tipo_demanda,
+        $nome_solicitante
     ));
 
     $id_demanda = (int)$pdo->lastInsertId();
@@ -172,9 +179,13 @@ if ($action === 'create') {
         }
     }
 
-    $status      = allowedOrDefault(post('status'), $allowedStatus, 'nao_iniciado');
-    $criticidade = allowedOrDefault(post('criticidade'), $allowedCrit, 'media');
-    $prazoDb     = normalizeDate(post('prazo'));
+    $status          = allowedOrDefault(post('status'), $allowedStatus, 'nao_iniciado');
+    $criticidade     = allowedOrDefault(post('criticidade'), $allowedCrit, 'media');
+    $prazoDb         = normalizeDate(post('prazo'));
+    $tipo_demanda    = allowedOrDefault(post('tipo_demanda'), $allowedTipo, null);
+    if (!in_array($tipo_demanda, $allowedTipo, true)) $tipo_demanda = null;
+    $nome_solicitante = ($tipo_demanda === 'solicitacao_novo_item' && post('nome_solicitante') !== '')
+                        ? post('nome_solicitante') : null;
 
     if ($id <= 0) redirect('/demandas.php?msg=id_invalido');
     if ($titulo === '') redirect('/demanda_edit.php?id='.$id.'&msg=titulo_obrigatorio');
@@ -188,7 +199,8 @@ if ($action === 'create') {
 
     $st = $pdo->prepare("
         UPDATE demandas
-        SET titulo=?, descricao=?, id_cliente=?, id_responsavel=?, status=?, criticidade=?, prazo=?, atualizado_em=NOW()
+        SET titulo=?, descricao=?, id_cliente=?, id_responsavel=?, status=?, criticidade=?, prazo=?,
+            tipo_demanda=?, nome_solicitante=?, atualizado_em=NOW()
         WHERE id=?
         LIMIT 1
     ");
@@ -200,6 +212,8 @@ if ($action === 'create') {
         $status,
         $criticidade,
         $prazoDb,
+        $tipo_demanda,
+        $nome_solicitante,
         $id
     ));
 

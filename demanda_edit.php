@@ -176,6 +176,23 @@ function isImageExt($filename){
             <div></div>
         </div>
 
+        <div class="grid">
+            <div>
+                <label>Tipo</label>
+                <select name="tipo_demanda" id="tipo_demanda_edit" onchange="toggleSolicitante(this,'solicitante_edit')">
+                    <option value="">Selecione o tipo</option>
+                    <option value="bug" <?= ($demanda['tipo_demanda']==='bug')?'selected':''; ?>>Bug</option>
+                    <option value="solicitacao_novo_item" <?= ($demanda['tipo_demanda']==='solicitacao_novo_item')?'selected':''; ?>>Solicitação novo item ou melhoria</option>
+                    <option value="uso_incorreto" <?= ($demanda['tipo_demanda']==='uso_incorreto')?'selected':''; ?>>Uso incorreto do Cliente</option>
+                    <option value="orientacoes_duvidas" <?= ($demanda['tipo_demanda']==='orientacoes_duvidas')?'selected':''; ?>>Orientações e Dúvidas</option>
+                </select>
+            </div>
+            <div id="solicitante_edit" style="display:<?= ($demanda['tipo_demanda']==='solicitacao_novo_item')?'block':'none'; ?>;">
+                <label>Nome do Solicitante</label>
+                <input type="text" name="nome_solicitante" value="<?= h($demanda['nome_solicitante']) ?>" placeholder="Nome de quem solicitou">
+            </div>
+        </div>
+
         <div class="grid grid-1">
             <div>
                 <label>Descrição</label>
@@ -221,5 +238,12 @@ function isImageExt($filename){
 
     </div>
 </form>
+
+<script>
+    function toggleSolicitante(sel, boxId){
+        var box = document.getElementById(boxId);
+        box.style.display = (sel.value === 'solicitacao_novo_item') ? 'block' : 'none';
+    }
+</script>
 
 <?php require_once __DIR__ . '/includes/layout_bottom.php'; ?>

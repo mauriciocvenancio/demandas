@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'auth.php';
 
 function h($s){ return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 

@@ -468,6 +468,23 @@ function diasCriacao($criado_em, $prazo){
                     <div></div>
                 </div>
 
+                <div class="grid">
+                    <div>
+                        <label>Tipo</label>
+                        <select name="tipo_demanda" id="tipo_demanda_create" onchange="toggleSolicitante(this,'solicitante_create')">
+                            <option value="">Selecione o tipo</option>
+                            <option value="bug">Bug</option>
+                            <option value="solicitacao_novo_item">Solicitação novo item ou melhoria</option>
+                            <option value="uso_incorreto">Uso incorreto do Cliente</option>
+                            <option value="orientacoes_duvidas">Orientações e Dúvidas</option>
+                        </select>
+                    </div>
+                    <div id="solicitante_create" style="display:none;">
+                        <label>Nome do Solicitante</label>
+                        <input type="text" name="nome_solicitante" placeholder="Nome de quem solicitou">
+                    </div>
+                </div>
+
                 <div class="grid grid-1">
                     <div>
                         <label>Descrição</label>
@@ -533,6 +550,11 @@ function diasCriacao($criado_em, $prazo){
     function toggleResp(v){
         var box = document.getElementById('resp_user_box');
         box.style.display = (v === 'user') ? 'block' : 'none';
+    }
+
+    function toggleSolicitante(sel, boxId){
+        var box = document.getElementById(boxId);
+        box.style.display = (sel.value === 'solicitacao_novo_item') ? 'block' : 'none';
     }
 
     // exibir nomes dos arquivos selecionados

@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'auth.php';
 
 $data = isset($_POST['data_lancamento']) ? $_POST['data_lancamento'] : '';
 $tipo = isset($_POST['tipo']) ? $_POST['tipo'] : '';

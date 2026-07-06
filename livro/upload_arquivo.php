@@ -1,11 +1,31 @@
 <?php
 require_once 'config.php';
+require_once 'auth.php';
 
 $id = isset($_POST['id_livro_caixa']) ? (int)$_POST['id_livro_caixa'] : 0;
 if ($id <= 0) die('ID inválido.');
 
+$data_ini     = isset($_POST['data_ini'])     ? $_POST['data_ini']     : '';
+$data_fim     = isset($_POST['data_fim'])     ? $_POST['data_fim']     : '';
+$tipo_filtro  = isset($_POST['tipo_filtro'])  ? $_POST['tipo_filtro']  : '';
+$saldo_ini    = isset($_POST['saldo_inicial'])? $_POST['saldo_inicial']: '';
+
+function buildRedirect($params = array()) {
+    $base = 'index.php';
+    $qs = array();
+    foreach ($params as $k => $v) {
+        if ($v !== '') $qs[] = urlencode($k) . '=' . urlencode($v);
+    }
+    return $qs ? $base . '?' . implode('&', $qs) : $base;
+}
+
 if (!isset($_FILES['arquivo']) || $_FILES['arquivo']['error'] !== UPLOAD_ERR_OK) {
-    header("Location: index.php");
+    header("Location: " . buildRedirect(array(
+        'data_ini'      => $data_ini,
+        'data_fim'      => $data_fim,
+        'tipo'          => $tipo_filtro,
+        'saldo_inicial' => $saldo_ini,
+    )));
     exit;
 }
 
@@ -63,5 +83,11 @@ $stmt->execute(array(
     ':tam' => ($tamanho ? $tamanho : null)
 ));
 
-header("Location: index.php");
+header("Location: " . buildRedirect(array(
+    'data_ini'      => $data_ini,
+    'data_fim'      => $data_fim,
+    'tipo'          => $tipo_filtro,
+    'saldo_inicial' => $saldo_ini,
+    'msg'           => 'Anexo enviado com sucesso.',
+)));
 exit;
