@@ -166,6 +166,42 @@ function diasCriacaoRel($criado_em, $prazo){
     return              array('txt' => $dias . 'd',      'cor' => '#dc2626');
 }
 
+/* ===== Texto resumo para WhatsApp ===== */
+function labelStatusWpp($s){
+    $map = array(
+        'nao_iniciado'               => 'Não iniciado',
+        'em_andamento'               => 'Em andamento',
+        'aguardando_resposta_cliente'=> 'Aguardando resposta',
+        'finalizado'                 => 'Finalizado',
+        'publicado'                  => 'Publicado',
+    );
+    return isset($map[$s]) ? $map[$s] : $s;
+}
+function labelCritWpp($c){
+    $map = array('baixa'=>'Baixa','media'=>'Média','alta'=>'Alta','urgente'=>'⚠️ Urgente');
+    return isset($map[$c]) ? $map[$c] : $c;
+}
+
+$wppLinhas = array();
+foreach ($linhas as $i => $r) {
+    $prazoFmt = !empty($r['prazo']) ? date('d/m/Y', strtotime($r['prazo'])) : 'Sem prazo';
+    $wppLinhas[] = ($i+1) . '. ' . $r['cliente_nome'] . ' — ' . $r['titulo']
+        . "\n   Status: " . labelStatusWpp($r['status'])
+        . ' · Criticidade: ' . labelCritWpp($r['criticidade'])
+        . ' · Prazo: ' . $prazoFmt;
+}
+$wppTexto  = "*📋 Relatório de Demandas*\n";
+$wppTexto .= "Período: " . date('d/m/Y', strtotime($data_ini)) . " a " . date('d/m/Y', strtotime($data_fim)) . "\n";
+$wppTexto .= "Total listado: " . count($linhas) . " demanda(s)\n\n";
+$wppTexto .= "*Resumo geral:*\n";
+$wppTexto .= "• Não iniciado: " . (int)$qtdNaoIniciadoTotal . "\n";
+$wppTexto .= "• Em andamento: " . (int)$qtdEmAndamentoTotal . "\n";
+$wppTexto .= "• Aguardando resposta: " . (int)$resumo['aguardando_resposta'] . "\n";
+$wppTexto .= "• Finalizado: " . (int)$resumo['finalizado'] . "\n";
+if (!empty($wppLinhas)) {
+    $wppTexto .= "\n*Demandas:*\n" . implode("\n\n", $wppLinhas);
+}
+
 $menuActive = 'relatorios';
 $pageTitle  = 'Relatório de Demandas';
 require_once __DIR__ . '/includes/layout_top.php';
@@ -225,6 +261,9 @@ $qtdFinalizadasHoje = (int)$stmt->fetchColumn();
         <div class="sub">Filtre por período, cliente, responsável, status e criticidade</div>
     </div>
     <div style="display:flex;gap:10px;">
+        <?php if (!empty($linhas)): ?>
+        <button class="btn" type="button" onclick="abrirResumoWpp()">📲 Resumo WhatsApp</button>
+        <?php endif; ?>
         <a class="btn btn-dark" href="<?= h($csvUrl) ?>">Exportar CSV</a>
     </div>
 </div>
@@ -351,5 +390,64 @@ $qtdFinalizadasHoje = (int)$stmt->fetchColumn();
         <div class="muted" style="padding:22px 10px;text-align:center;">Nenhuma demanda encontrada para os filtros aplicados.</div>
     <?php endif; ?>
 </div>
+
+<!-- Modal Resumo WhatsApp -->
+<div id="wppModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:20px;padding:24px;width:620px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.18);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <div style="font-size:17px;font-weight:900;">📲 Resumo para WhatsApp</div>
+                <div style="font-size:12px;color:var(--muted);font-weight:700;margin-top:3px;">Copie o texto ou abra direto no WhatsApp Web</div>
+            </div>
+            <button onclick="fecharResumoWpp()" style="border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;cursor:pointer;font-size:18px;font-weight:900;">×</button>
+        </div>
+
+        <textarea id="wppTexto" readonly style="flex:1;min-height:340px;resize:vertical;border:1px solid var(--line);border-radius:14px;padding:14px;font-size:13px;font-family:inherit;line-height:1.6;outline:none;"></textarea>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button class="btn" onclick="fecharResumoWpp()">Fechar</button>
+            <button class="btn" id="btnCopiar" onclick="copiarWpp()">📋 Copiar texto</button>
+            <button class="btn btn-dark" onclick="abrirWhatsApp()">💬 Abrir WhatsApp Web</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var wppTextoOriginal = <?= json_encode($wppTexto) ?>;
+
+function abrirResumoWpp(){
+    document.getElementById('wppTexto').value = wppTextoOriginal;
+    document.getElementById('btnCopiar').textContent = '📋 Copiar texto';
+    document.getElementById('wppModal').style.display = 'flex';
+}
+function fecharResumoWpp(){
+    document.getElementById('wppModal').style.display = 'none';
+}
+function copiarWpp(){
+    var ta = document.getElementById('wppTexto');
+    ta.select();
+    ta.setSelectionRange(0, 99999);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch(e){}
+    if (!ok && navigator.clipboard) {
+        navigator.clipboard.writeText(ta.value);
+        ok = true;
+    }
+    var btn = document.getElementById('btnCopiar');
+    btn.textContent = '✅ Copiado!';
+    setTimeout(function(){ btn.textContent = '📋 Copiar texto'; }, 2500);
+}
+function abrirWhatsApp(){
+    var texto = document.getElementById('wppTexto').value;
+    var url = 'https://web.whatsapp.com/send?text=' + encodeURIComponent(texto);
+    window.open(url, '_blank');
+}
+document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') fecharResumoWpp();
+});
+document.getElementById('wppModal').addEventListener('click', function(e){
+    if (e.target === this) fecharResumoWpp();
+});
+</script>
 
 <?php require_once __DIR__ . '/includes/layout_bottom.php'; ?>
