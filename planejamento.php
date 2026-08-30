@@ -68,14 +68,17 @@ foreach ($itensRaw as $item) {
     }
 }
 
-// ── Horas alocadas por dev/dia ────────────────────────────────────────
+// ── Horas alocadas por dev/dia (todos os itens, inclusive finalizados) ──
 $horasDia = array(); // [id_dev][data] = float
 foreach ($devs as $dev) {
     $horasDia[$dev['id']] = array();
     foreach ($diasSemana as $dia) {
         $soma = 0;
         foreach ($calendario[$dev['id']][$dia['date']] as $it) {
-            if ($it['status'] !== 'finalizado') {
+            // finalizados usam tempo_real; demais usam estimativa_media
+            if ($it['status'] === 'finalizado' && !empty($it['tempo_real'])) {
+                $soma += (float)$it['tempo_real'];
+            } else {
                 $soma += (float)$it['estimativa_media'];
             }
         }
@@ -83,29 +86,58 @@ foreach ($devs as $dev) {
     }
 }
 
-// ── Suportes finalizados (horas não planejadas) ───────────────────────
+// ── Itens não planejados: suportes finalizados ────────────────────────
+$naoPlanejados = array(); // [id_dev][data] = [itens]
+
 $stmtSup = $pdo->prepare("
     SELECT
-        DATE(s.criado_em)          AS data_sup,
+        DATE(s.criado_em)          AS data_np,
         s.id_usuario_responsavel   AS id_dev,
-        s.assunto,
-        s.duracao_min
+        s.assunto                  AS titulo,
+        COALESCE(s.duracao_min, 30) AS duracao_min
     FROM suportes s
     WHERE s.ativo = 1
       AND s.status = 'finalizado'
-      AND s.duracao_min IS NOT NULL
-      AND s.duracao_min > 0
       AND DATE(s.criado_em) BETWEEN ? AND ?
     ORDER BY s.criado_em
 ");
 $stmtSup->execute(array($dataIni, $dataFim));
-$suportesNaoPlanejados = array(); // [id_dev][data] = [itens]
 foreach ($stmtSup->fetchAll() as $s) {
     $did  = (int)$s['id_dev'];
-    $data = $s['data_sup'];
-    if (!isset($suportesNaoPlanejados[$did])) $suportesNaoPlanejados[$did] = array();
-    if (!isset($suportesNaoPlanejados[$did][$data])) $suportesNaoPlanejados[$did][$data] = array();
-    $suportesNaoPlanejados[$did][$data][] = $s;
+    $data = $s['data_np'];
+    if (!isset($naoPlanejados[$did]))       $naoPlanejados[$did] = array();
+    if (!isset($naoPlanejados[$did][$data])) $naoPlanejados[$did][$data] = array();
+    $naoPlanejados[$did][$data][] = array(
+        'titulo'     => $s['titulo'],
+        'duracao_min'=> (int)$s['duracao_min'],
+        'origem'     => 'suporte',
+    );
+}
+
+// ── Itens não planejados: demandas finalizadas ────────────────────────
+$stmtDem = $pdo->prepare("
+    SELECT
+        DATE(d.atualizado_em)  AS data_np,
+        d.id_responsavel       AS id_dev,
+        d.titulo
+    FROM demandas d
+    WHERE d.ativo = 1
+      AND d.status = 'finalizado'
+      AND d.atualizado_em IS NOT NULL
+      AND DATE(d.atualizado_em) BETWEEN ? AND ?
+    ORDER BY d.atualizado_em
+");
+$stmtDem->execute(array($dataIni, $dataFim));
+foreach ($stmtDem->fetchAll() as $dem) {
+    $did  = (int)$dem['id_dev'];
+    $data = $dem['data_np'];
+    if (!isset($naoPlanejados[$did]))       $naoPlanejados[$did] = array();
+    if (!isset($naoPlanejados[$did][$data])) $naoPlanejados[$did][$data] = array();
+    $naoPlanejados[$did][$data][] = array(
+        'titulo'     => $dem['titulo'],
+        'duracao_min'=> 30,
+        'origem'     => 'demanda',
+    );
 }
 
 // Todos os usuários (para selects)
@@ -320,15 +352,15 @@ require_once __DIR__ . '/includes/layout_top.php';
                 <?php endforeach; ?>
 
                 <?php
-                // Suportes não planejados nesse dia para esse dev
-                if (!empty($suportesNaoPlanejados[$did][$data])):
-                    foreach ($suportesNaoPlanejados[$did][$data] as $sp):
-                        $hSup = round($sp['duracao_min'] / 60, 1);
+                if (!empty($naoPlanejados[$did][$data])):
+                    foreach ($naoPlanejados[$did][$data] as $np):
+                        $hNp  = round($np['duracao_min'] / 60, 1);
+                        $icon = $np['origem'] === 'demanda' ? '📋' : '🎧';
                 ?>
                 <div class="nao-plan-card">
-                    <div class="np-label">Não planejado</div>
-                    <div class="np-title"><?= h($sp['assunto']) ?></div>
-                    <div class="np-horas"><?= $hSup ?>h</div>
+                    <div class="np-label"><?= $icon ?> Não planejado · <?= $np['origem'] === 'demanda' ? 'Demanda' : 'Suporte' ?></div>
+                    <div class="np-title"><?= h($np['titulo']) ?></div>
+                    <div class="np-horas"><?= $hNp ?>h</div>
                 </div>
                 <?php   endforeach;
                 endif; ?>

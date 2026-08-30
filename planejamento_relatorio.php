@@ -41,27 +41,52 @@ $stmtIt = $pdo->prepare("
 $stmtIt->execute($paramsIt);
 $itens = $stmtIt->fetchAll();
 
-// ── Suportes não planejados no período ────────────────────────────────
-$whereSup  = array("s.ativo=1", "s.status='finalizado'", "s.duracao_min > 0", "DATE(s.criado_em) BETWEEN ? AND ?");
+// ── Itens não planejados: suportes finalizados ────────────────────────
+$whereSup  = array("s.ativo=1", "s.status='finalizado'", "DATE(s.criado_em) BETWEEN ? AND ?");
 $paramsSup = array($data_ini, $data_fim);
 if ($id_dev_fil > 0) {
     $whereSup[] = "s.id_usuario_responsavel = ?";
     $paramsSup[] = $id_dev_fil;
 }
-
 $stmtSup = $pdo->prepare("
     SELECT
-        s.assunto,
-        s.duracao_min,
-        DATE(s.criado_em) AS data_sup,
-        u.nome AS dev_nome
+        s.assunto                   AS titulo,
+        COALESCE(s.duracao_min, 30) AS duracao_min,
+        DATE(s.criado_em)           AS data_np,
+        u.nome                      AS dev_nome,
+        'Suporte'                   AS origem
     FROM suportes s
     JOIN usuarios u ON u.id = s.id_usuario_responsavel
     WHERE " . implode(" AND ", $whereSup) . "
-    ORDER BY data_sup ASC, u.nome ASC
+    ORDER BY data_np ASC, u.nome ASC
 ");
 $stmtSup->execute($paramsSup);
-$suportes = $stmtSup->fetchAll();
+$naoPlanejados = $stmtSup->fetchAll();
+
+// ── Itens não planejados: demandas finalizadas (30 min padrão) ─────────
+$whereDem  = array("d.ativo=1", "d.status='finalizado'", "d.atualizado_em IS NOT NULL", "DATE(d.atualizado_em) BETWEEN ? AND ?");
+$paramsDem = array($data_ini, $data_fim);
+if ($id_dev_fil > 0) {
+    $whereDem[] = "d.id_responsavel = ?";
+    $paramsDem[] = $id_dev_fil;
+}
+$stmtDem = $pdo->prepare("
+    SELECT
+        d.titulo,
+        30                      AS duracao_min,
+        DATE(d.atualizado_em)   AS data_np,
+        u.nome                  AS dev_nome,
+        'Demanda'               AS origem
+    FROM demandas d
+    JOIN usuarios u ON u.id = d.id_responsavel
+    WHERE " . implode(" AND ", $whereDem) . "
+    ORDER BY data_np ASC, u.nome ASC
+");
+$stmtDem->execute($paramsDem);
+$naoPlanejados = array_merge($naoPlanejados, $stmtDem->fetchAll());
+
+// ordenar por data
+usort($naoPlanejados, function($a, $b){ return strcmp($a['data_np'].$a['dev_nome'], $b['data_np'].$b['dev_nome']); });
 
 // ── Totais para cards ─────────────────────────────────────────────────
 $totalItens     = count($itens);
@@ -76,7 +101,7 @@ foreach ($itens as $it) {
     }
 }
 $totalNaoPlan = 0;
-foreach ($suportes as $s) { $totalNaoPlan += round($s['duracao_min'] / 60, 2); }
+foreach ($naoPlanejados as $np) { $totalNaoPlan += round($np['duracao_min'] / 60, 2); }
 
 $menuActive = 'planejamento';
 $pageTitle  = 'Relatório de Planejamento';
@@ -249,25 +274,31 @@ require_once __DIR__ . '/includes/layout_top.php';
 </div>
 
 <!-- ── Tabela de horas não planejadas ────────────────────────────── -->
-<div class="section-title">⚡ Horas Não Planejadas — Suportes Finalizados</div>
+<div class="section-title">⚡ Horas Não Planejadas — Demandas e Suportes Finalizados</div>
 <div class="panel">
-    <?php if (!empty($suportes)): ?>
+    <?php if (!empty($naoPlanejados)): ?>
     <table>
         <thead>
         <tr>
             <th>Data</th>
             <th>Desenvolvedor</th>
-            <th>Assunto do Suporte</th>
+            <th>Título</th>
+            <th>Origem</th>
             <th>Duração</th>
         </tr>
         </thead>
         <tbody>
-        <?php foreach ($suportes as $s): ?>
+        <?php foreach ($naoPlanejados as $np): ?>
         <tr class="np-row">
-            <td><?= h(date('d/m/Y', strtotime($s['data_sup']))) ?></td>
-            <td><?= h($s['dev_nome']) ?></td>
-            <td><?= h($s['assunto']) ?></td>
-            <td style="color:#b45309;font-weight:900;"><?= number_format($s['duracao_min']/60, 1) ?>h</td>
+            <td><?= h(date('d/m/Y', strtotime($np['data_np']))) ?></td>
+            <td><?= h($np['dev_nome']) ?></td>
+            <td><?= h($np['titulo']) ?></td>
+            <td>
+                <span class="badge" style="<?= $np['origem']==='Demanda' ? 'background:#eff6ff;border-color:#93c5fd;color:#1d4ed8;' : 'background:#fffbeb;border-color:#fde68a;color:#92400e;' ?>">
+                    <?= $np['origem']==='Demanda' ? '📋 Demanda' : '🎧 Suporte' ?>
+                </span>
+            </td>
+            <td style="color:#b45309;font-weight:900;"><?= number_format($np['duracao_min']/60, 1) ?>h</td>
         </tr>
         <?php endforeach; ?>
         </tbody>
