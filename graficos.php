@@ -175,6 +175,41 @@ foreach ($rowsG5 as $r) {
 $g5Height = max(220, count($g5Labels) * 42);
 $g2Height = max(220, count($g2Labels) * 42);
 
+/* ====== Gráfico 6 — Suportes por tipo de contato (rosca) ====== */
+$rowsG6 = $pdo->query("
+    SELECT tipo_contato, COUNT(*) AS total
+    FROM suportes
+    WHERE ativo=1
+      AND tipo_contato IS NOT NULL
+      AND tipo_contato <> ''
+    GROUP BY tipo_contato
+    ORDER BY total DESC
+")->fetchAll();
+
+$tipoContatoLabels = array(
+    'melhoria'     => 'Melhoria',
+    'duvida'       => 'Dúvida',
+    'solicitacao'  => 'Solicitação',
+    'bug'          => 'Bug',
+    'configuracao' => 'Configuração',
+);
+$tipoContatoColors = array(
+    'melhoria'     => '#60a5fa',
+    'duvida'       => '#fbbf24',
+    'solicitacao'  => '#34d399',
+    'bug'          => '#f87171',
+    'configuracao' => '#a78bfa',
+);
+$g6Labels = array();
+$g6Data   = array();
+$g6Colors = array();
+foreach ($rowsG6 as $r) {
+    $k = $r['tipo_contato'];
+    $g6Labels[] = isset($tipoContatoLabels[$k]) ? $tipoContatoLabels[$k] : ucfirst($k);
+    $g6Data[]   = (int)$r['total'];
+    $g6Colors[] = isset($tipoContatoColors[$k]) ? $tipoContatoColors[$k] : '#6b7280';
+}
+
 /* ====== Meses para o selector ====== */
 $meses = array(
     1=>'Janeiro',2=>'Fevereiro',3=>'Março',4=>'Abril',
@@ -355,7 +390,22 @@ require_once __DIR__ . '/includes/layout_top.php';
         </div>
     </div>
 
-    <!-- Gráfico 5: Suportes por cliente -->
+    <!-- Gráfico 6: Tipos de contato (rosca) -->
+    <div class="panel">
+        <div class="panel-head">
+            <div>
+                <div class="panel-title">Tipos de Contato</div>
+                <div class="panel-sub">Distribuição de todos os suportes registrados</div>
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="chartG6"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Gráfico 5: Suportes por cliente -->
+<div class="grid1">
     <div class="panel">
         <div class="panel-head">
             <div>
@@ -488,6 +538,32 @@ require_once __DIR__ . '/includes/layout_top.php';
                     grid: { color: '#f3f4f6' }
                 },
                 x: { grid: { display: false } }
+            }
+        }
+    });
+
+    /* ── Gráfico 6: Tipos de contato (rosca) ── */
+    new Chart(document.getElementById('chartG6'), {
+        type: 'doughnut',
+        data: {
+            labels: <?= json_encode($g6Labels) ?>,
+            datasets: [{
+                data: <?= json_encode($g6Data) ?>,
+                backgroundColor: <?= json_encode($g6Colors) ?>,
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 8,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { padding: 16, font: { size: 12, weight: '700' } }
+                }
             }
         }
     });

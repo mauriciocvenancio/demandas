@@ -251,7 +251,9 @@ function menuItem($key, $label, $href, $icon, $activeKey){
                 menuItem('suportes',      'Suportes',        'suportes.php',       '🎧', $menuActive);
                 menuItem('relatorios',    'Relatórios',      'relatorios.php',     '📊', $menuActive);
                 menuItem('fila_demandas', 'Fila de Demandas','fila_demandas.php',  '📌', $menuActive);
-                menuItem('graficos',      'Gráficos',         'graficos.php',        '📈', $menuActive);
+                menuItem('graficos',       'Gráficos',          'graficos.php',        '📈', $menuActive);
+                menuItem('planejamento',  'Planejamento',      'planejamento.php',    '📅', $menuActive);
+                menuItem('solicitacoes',  'Solicitações',      'solicitacoes.php',    '💡', $menuActive);
             }
             ?>
         </nav>

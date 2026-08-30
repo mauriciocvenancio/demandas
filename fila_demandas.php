@@ -60,9 +60,7 @@ if ($ftipo !== '' && in_array($ftipo, $allowedTipos, true)) {
     }
 }
 
-$orderBy = ($ftipo !== '' && in_array($ftipo, $allowedTipos, true))
-    ? "d.criado_em ASC"
-    : "CASE d.criticidade WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 WHEN 'baixa' THEN 4 ELSE 5 END, d.id DESC";
+$orderBy = "d.criado_em ASC";
 
 $sql = "
 SELECT d.id,

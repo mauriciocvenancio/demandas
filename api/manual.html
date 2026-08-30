@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>Manual da API — Solicitações</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#f6f7fb;
+    --card:#fff;
+    --text:#111827;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --primary:#111827;
+    --blue:#2563eb;
+    --green:#16a34a;
+    --red:#dc2626;
+    --orange:#ea580c;
+    --yellow:#d97706;
+    --radius:14px;
+    --sidebar:260px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+  a{color:var(--blue);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+
+  /* ── Layout ── */
+  .app{display:flex;min-height:100vh;}
+
+  /* sidebar */
+  .sidebar{
+    width:var(--sidebar);
+    background:#fff;
+    border-right:1px solid var(--line);
+    position:fixed;top:0;left:0;bottom:0;
+    overflow-y:auto;
+    display:flex;flex-direction:column;
+    z-index:10;
+  }
+  .sidebar-brand{
+    padding:20px 18px 14px;
+    border-bottom:1px solid var(--line);
+  }
+  .sidebar-brand .logo{
+    display:flex;align-items:center;gap:10px;margin-bottom:4px;
+  }
+  .sidebar-brand .logo-ic{
+    width:36px;height:36px;border-radius:10px;
+    background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;
+  }
+  .sidebar-brand .logo-t{font-weight:900;font-size:15px;}
+  .sidebar-brand .logo-s{font-size:11px;color:var(--muted);}
+  .sidebar-brand .version{
+    margin-top:8px;font-size:11px;font-weight:700;
+    background:#f3f4f6;border-radius:6px;padding:2px 8px;display:inline-block;color:var(--muted);
+  }
+
+  .nav-section{padding:14px 12px 4px;}
+  .nav-section-title{font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0 6px;margin-bottom:4px;}
+  .nav-link{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 10px;border-radius:10px;
+    font-size:13px;font-weight:700;color:#374151;
+    transition:.12s;
+  }
+  .nav-link:hover{background:#f3f4f6;text-decoration:none;}
+  .nav-link.active{background:#111;color:#fff;}
+  .nav-link .method{
+    font-size:10px;font-weight:900;padding:2px 6px;border-radius:6px;flex-shrink:0;
+  }
+  .m-get{background:#dcfce7;color:#15803d;}
+  .m-post{background:#dbeafe;color:#1d4ed8;}
+  .m-patch{background:#fef9c3;color:#a16207;}
+
+  /* main */
+  .main{margin-left:var(--sidebar);flex:1;padding:40px 48px;max-width:960px;}
+
+  /* sections */
+  .section{margin-bottom:56px;scroll-margin-top:24px;}
+  .section-title{font-size:22px;font-weight:900;margin-bottom:6px;padding-bottom:10px;border-bottom:2px solid var(--line);}
+  .section-sub{font-size:14px;color:var(--muted);margin-bottom:20px;}
+
+  h3{font-size:15px;font-weight:900;margin:22px 0 8px;}
+  p{font-size:14px;margin-bottom:12px;color:#374151;}
+
+  /* endpoint card */
+  .endpoint{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;margin-bottom:32px;
+  }
+  .endpoint-head{
+    display:flex;align-items:center;gap:12px;
+    padding:14px 18px;border-bottom:1px solid var(--line);
+    background:#fafafa;
+  }
+  .method-badge{
+    font-size:12px;font-weight:900;padding:4px 12px;border-radius:8px;flex-shrink:0;
+    font-family:monospace;letter-spacing:.03em;
+  }
+  .badge-get   {background:#dcfce7;color:#15803d;}
+  .badge-post  {background:#dbeafe;color:#1d4ed8;}
+  .badge-patch {background:#fef9c3;color:#a16207;}
+  .endpoint-url{font-family:monospace;font-size:14px;font-weight:700;color:var(--text);}
+  .endpoint-desc{font-size:13px;color:var(--muted);margin-left:auto;}
+  .endpoint-body{padding:18px 20px;}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;}
+  th{text-align:left;padding:9px 12px;font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--line);background:#fafafa;}
+  td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tr:last-child td{border-bottom:0;}
+  .req{color:var(--red);font-weight:900;}
+  .opt{color:var(--muted);}
+  code{font-family:monospace;font-size:12px;background:#f3f4f6;padding:1px 5px;border-radius:5px;color:#374151;}
+
+  /* code blocks */
+  .code-block{
+    background:#1e293b;border-radius:12px;overflow:hidden;margin-bottom:16px;
+  }
+  .code-block-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;background:#0f172a;
+    font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;
+  }
+  .copy-btn{
+    background:transparent;border:1px solid #334155;color:#94a3b8;
+    border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;
+  }
+  .copy-btn:hover{background:#334155;color:#e2e8f0;}
+  .code-block pre{
+    padding:16px;overflow-x:auto;
+    font-family:'Courier New',monospace;font-size:13px;line-height:1.6;color:#e2e8f0;
+  }
+  .code-block pre .kw{color:#7dd3fc;}   /* method/key */
+  .code-block pre .str{color:#86efac;}  /* string value */
+  .code-block pre .num{color:#fbbf24;}  /* number */
+  .code-block pre .cm{color:#64748b;}   /* comment */
+  .code-block pre .url{color:#f9a8d4;}  /* url */
+  .code-block pre .hd{color:#c4b5fd;}   /* header */
+
+  /* status badges */
+  .status-flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+  .st-badge{
+    display:inline-flex;align-items:center;padding:5px 12px;border-radius:999px;
+    font-size:12px;font-weight:900;border:1px solid transparent;
+  }
+  .arrow{color:var(--muted);font-size:16px;}
+
+  /* alert boxes */
+  .alert{border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:16px;border:1px solid;}
+  .alert-blue{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
+  .alert-yellow{background:#fefce8;border-color:#fef08a;color:#a16207;}
+  .alert-red{background:#fef2f2;border-color:#fecaca;color:#dc2626;}
+  .alert-green{background:#f0fdf4;border-color:#bbf7d0;color:#15803d;}
+
+  /* http code chips */
+  .http-chip{display:inline-block;font-family:monospace;font-size:12px;font-weight:900;padding:2px 8px;border-radius:6px;margin-right:6px;}
+  .http-2{background:#dcfce7;color:#15803d;}
+  .http-4{background:#fef2f2;color:#dc2626;}
+
+  /* value tables */
+  .val-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px;}
+  .val-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .val-card .slug{font-family:monospace;font-size:12px;font-weight:900;color:#374151;margin-bottom:4px;}
+  .val-card .label{font-size:13px;font-weight:700;}
+  .val-card .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;}
+
+  @media(max-width:860px){
+    .sidebar{display:none;}
+    .main{margin-left:0;padding:24px 18px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo">
+      <div class="logo-ic">📡</div>
+      <div>
+        <div class="logo-t">API Solicitações</div>
+        <div class="logo-s">Documentação oficial</div>
+      </div>
+    </div>
+    <span class="version">v1.0 — Ago 2026</span>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title">Introdução</div>
+    <a class="nav-link active" href="#autenticacao">🔑 Autenticação</a>
+    <a class="nav-link" href="#valores">📋 Valores aceitos</a>
+    <a class="nav-link" href="#erros">⚠️ Erros e HTTP codes</a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title">Endpoints</div>
+    <a class="nav-link" href="#post-criar">
+      <span class="method m-post">POST</span> Criar solicitação
+    </a>
+    <a class="nav-link" href="#get-detalhe">
+      <span class="method m-get">GET</span> Detalhe
+    </a>
+    <a class="nav-link" href="#get-listar">
+      <span class="method m-get">GET</span> Listar por cidade
+    </a>
+    <a class="nav-link" href="#get-cidades">
+      <span class="method m-get">GET</span> Listar cidades
+    </a>
+    <a class="nav-link" href="#get-ref">
+      <span class="method m-get">GET</span> Buscar por ref. externa
+    </a>
+    <a class="nav-link" href="#patch-status">
+      <span class="method m-patch">PATCH</span> Atualizar status
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title">Guias</div>
+    <a class="nav-link" href="#fluxo">🔄 Fluxo de integração</a>
+    <a class="nav-link" href="#curl">💻 Exemplos cURL</a>
+    <a class="nav-link" href="#tokens">🛡️ Gerenciar tokens</a>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<main class="main">
+
+  <!-- Cabeçalho -->
+  <div style="margin-bottom:40px;">
+    <div style="font-size:12px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Documentação</div>
+    <h1 style="font-size:32px;font-weight:900;margin-bottom:8px;">API de Solicitações</h1>
+    <p style="font-size:15px;color:var(--muted);margin-bottom:16px;">
+      API REST para integração de sistemas externos com o módulo de Solicitações (novo item / melhoria).
+      Permite criar, consultar e atualizar o status de solicitações diretamente via HTTP.
+    </p>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="background:#1e293b;border-radius:10px;padding:10px 16px;font-family:monospace;font-size:13px;color:#e2e8f0;">
+        <span style="color:#64748b;">Base URL: </span>
+        <span style="color:#f9a8d4;">https://seudominio.com.br/demandas/api/solicitacoes.php</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Autenticação ── -->
+  <div class="section" id="autenticacao">
+    <div class="section-title">🔑 Autenticação</div>
+    <p>Todas as requisições devem enviar o token de acesso no header HTTP:</p>
+
+    <div class="code-block">
+      <div class="code-block-head"><span>Header obrigatório</span></div>
+      <pre><span class="hd">X-Api-Token:</span> <span class="str">SEU_TOKEN_AQUI</span></pre>
+    </div>
+
+    <div class="alert alert-yellow">
+      ⚠️ O token é gerado no banco de dados na tabela <code>api_tokens</code>. Guarde-o em local seguro e nunca o exponha publicamente.
+    </div>
+
+    <h3>Resposta quando o token é inválido ou ausente</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>HTTP 401</span></div>
+      <pre>{ <span class="kw">"ok"</span>: <span class="str">false</span>, <span class="kw">"erro"</span>: <span class="str">"Token inválido ou inativo."</span> }</pre>
+    </div>
+  </div>
+
+  <!-- ── Valores aceitos ── -->
+  <div class="section" id="valores">
+    <div class="section-title">📋 Valores aceitos</div>
+
+    <h3>tipo</h3>
+    <div class="val-grid">
+      <div class="val-card"><div class="slug">novo_item</div><div class="label">Novo Item</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Nova funcionalidade inexistente</div></div>
+      <div class="val-card"><div class="slug">melhoria</div><div class="label">Melhoria</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Aprimoramento de algo existente</div></div>
+    </div>
+
+    <h3>prioridade</h3>
+    <div class="val-grid">
+      <div class="val-card"><div class="slug">baixa</div><div class="label"><span class="dot" style="background:#16a34a;"></span>Baixa</div></div>
+      <div class="val-card"><div class="slug">media</div><div class="label"><span class="dot" style="background:#ca8a04;"></span>Média <span style="font-size:11px;color:var(--muted);">(padrão)</span></div></div>
+      <div class="val-card"><div class="slug">alta</div><div class="label"><span class="dot" style="background:#ea580c;"></span>Alta</div></div>
+      <div class="val-card"><div class="slug">urgente</div><div class="label"><span class="dot" style="background:#dc2626;"></span>Urgente</div></div>
+    </div>
+
+    <h3>status</h3>
+    <div class="status-flow">
+      <span class="st-badge" style="background:#f3f4f6;color:#6b7280;border-color:#e5e7eb;">nova</span>
+      <span class="arrow">→</span>
+      <span class="st-badge" style="background:#dbeafe;color:#2563eb;border-color:#bfdbfe;">em_analise</span>
+      <span class="arrow">→</span>
+      <span class="st-badge" style="background:#dcfce7;color:#16a34a;border-color:#bbf7d0;">aprovada</span>
+      <span class="arrow">→</span>
+      <span class="st-badge" style="background:#fef9c3;color:#ca8a04;border-color:#fef08a;">em_desenvolvimento</span>
+      <span class="arrow">→</span>
+      <span class="st-badge" style="background:#ffedd5;color:#ea580c;border-color:#fed7aa;">aguardando_homologacao</span>
+      <span class="arrow">→</span>
+      <span class="st-badge" style="background:#dcfce7;color:#15803d;border-color:#86efac;">implantada</span>
+    </div>
+    <table>
+      <thead><tr><th>Slug</th><th>Label</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td><code>nova</code></td><td>Nova</td><td>Recebida, aguardando análise</td></tr>
+        <tr><td><code>em_analise</code></td><td>Em Análise</td><td>Equipe avaliando viabilidade</td></tr>
+        <tr><td><code>aprovada</code></td><td>Aprovada</td><td>Aceita, aguardando desenvolvimento</td></tr>
+        <tr><td><code>em_desenvolvimento</code></td><td>Em Desenvolvimento</td><td>Em construção</td></tr>
+        <tr><td><code>aguardando_homologacao</code></td><td>Ag. Homologação</td><td>Pronta, aguardando validação</td></tr>
+        <tr><td><code>implantada</code></td><td>Implantada</td><td>Entregue em produção</td></tr>
+        <tr><td><code>rejeitada</code></td><td>Rejeitada</td><td>Não será implementada</td></tr>
+        <tr><td><code>cancelada</code></td><td>Cancelada</td><td>Cancelada pelo solicitante ou equipe</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── POST Criar ── -->
+  <div class="section" id="post-criar">
+    <div class="section-title">Criar Solicitação</div>
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method-badge badge-post">POST</span>
+        <span class="endpoint-url">/api/solicitacoes.php</span>
+        <span class="endpoint-desc">Cria uma nova solicitação</span>
+      </div>
+      <div class="endpoint-body">
+        <p>A solicitação entra automaticamente com status <code>nova</code> e origem <code>api</code>.</p>
+
+        <h3>Campos do body (JSON)</h3>
+        <table>
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Req.</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code>titulo</code></td><td>string</td><td><span class="req">✅</span></td><td>Título da solicitação (máx. 200 chars)</td></tr>
+            <tr><td><code>cidade</code></td><td>string</td><td><span class="req">✅</span></td><td>Cidade do solicitante</td></tr>
+            <tr><td><code>nome_solicitante</code></td><td>string</td><td><span class="req">✅</span></td><td>Nome completo</td></tr>
+            <tr><td><code>tipo</code></td><td>string</td><td><span class="opt">—</span></td><td><code>novo_item</code> ou <code>melhoria</code> (padrão: <code>novo_item</code>)</td></tr>
+            <tr><td><code>descricao</code></td><td>string</td><td><span class="opt">—</span></td><td>Descrição detalhada</td></tr>
+            <tr><td><code>email_solicitante</code></td><td>string</td><td><span class="opt">—</span></td><td>E-mail de contato</td></tr>
+            <tr><td><code>telefone_solicitante</code></td><td>string</td><td><span class="opt">—</span></td><td>Telefone de contato</td></tr>
+            <tr><td><code>cargo_solicitante</code></td><td>string</td><td><span class="opt">—</span></td><td>Cargo ou função</td></tr>
+            <tr><td><code>prioridade</code></td><td>string</td><td><span class="opt">—</span></td><td>Ver tabela de valores (padrão: <code>media</code>)</td></tr>
+            <tr><td><code>ref_externa</code></td><td>string</td><td><span class="opt">—</span></td><td>ID ou código no sistema externo</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Requisição</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP Request</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+          <pre><span class="kw">POST</span> <span class="url">/demandas/api/solicitacoes.php</span>
+<span class="hd">X-Api-Token:</span> <span class="str">SEU_TOKEN_AQUI</span>
+<span class="hd">Content-Type:</span> <span class="str">application/json</span>
+
+{
+  <span class="kw">"tipo"</span>:                 <span class="str">"melhoria"</span>,
+  <span class="kw">"titulo"</span>:               <span class="str">"Adicionar campo CPF no cadastro"</span>,
+  <span class="kw">"descricao"</span>:            <span class="str">"Precisamos registrar o CPF para emissão de relatórios."</span>,
+  <span class="kw">"cidade"</span>:               <span class="str">"Bituruna"</span>,
+  <span class="kw">"nome_solicitante"</span>:     <span class="str">"Maria Souza"</span>,
+  <span class="kw">"email_solicitante"</span>:    <span class="str">"maria@bituruna.pr.gov.br"</span>,
+  <span class="kw">"telefone_solicitante"</span>: <span class="str">"(42) 99812-3456"</span>,
+  <span class="kw">"cargo_solicitante"</span>:    <span class="str">"Assistente Social"</span>,
+  <span class="kw">"prioridade"</span>:            <span class="str">"alta"</span>,
+  <span class="kw">"ref_externa"</span>:          <span class="str">"TICKET-2024-001"</span>
+}</pre>
+        </div>
+
+        <h3>Resposta de sucesso</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 201 — Created</span></div>
+          <pre>{ <span class="kw">"ok"</span>: <span class="str">true</span>, <span class="kw">"id"</span>: <span class="num">15</span>, <span class="kw">"status"</span>: <span class="str">"nova"</span> }</pre>
+        </div>
+
+        <h3>Erros possíveis</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 400</span></div>
+          <pre>{ <span class="kw">"ok"</span>: <span class="str">false</span>, <span class="kw">"erro"</span>: <span class="str">"Campo obrigatório: titulo."</span> }
+{ <span class="kw">"ok"</span>: <span class="str">false</span>, <span class="kw">"erro"</span>: <span class="str">"Body JSON inválido ou vazio."</span> }</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GET Detalhe ── -->
+  <div class="section" id="get-detalhe">
+    <div class="section-title">Detalhe de uma Solicitação</div>
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-url">/api/solicitacoes.php?id=X</span>
+        <span class="endpoint-desc">Retorna dados completos + histórico</span>
+      </div>
+      <div class="endpoint-body">
+        <h3>Parâmetros de URL</h3>
+        <table>
+          <thead><tr><th>Parâmetro</th><th>Req.</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td><span class="req">✅</span></td><td>ID da solicitação</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Requisição</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP Request</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+          <pre><span class="kw">GET</span> <span class="url">/demandas/api/solicitacoes.php?id=15</span>
+<span class="hd">X-Api-Token:</span> <span class="str">SEU_TOKEN_AQUI</span></pre>
+        </div>
+
+        <h3>Resposta de sucesso</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 200</span></div>
+          <pre>{
+  <span class="kw">"ok"</span>: <span class="str">true</span>,
+  <span class="kw">"solicitacao"</span>: {
+    <span class="kw">"id"</span>:                   <span class="num">15</span>,
+    <span class="kw">"tipo"</span>:                 <span class="str">"melhoria"</span>,
+    <span class="kw">"titulo"</span>:               <span class="str">"Adicionar campo CPF no cadastro"</span>,
+    <span class="kw">"descricao"</span>:            <span class="str">"Precisamos registrar o CPF..."</span>,
+    <span class="kw">"cidade"</span>:               <span class="str">"Bituruna"</span>,
+    <span class="kw">"nome_solicitante"</span>:     <span class="str">"Maria Souza"</span>,
+    <span class="kw">"email_solicitante"</span>:    <span class="str">"maria@bituruna.pr.gov.br"</span>,
+    <span class="kw">"telefone_solicitante"</span>: <span class="str">"(42) 99812-3456"</span>,
+    <span class="kw">"cargo_solicitante"</span>:    <span class="str">"Assistente Social"</span>,
+    <span class="kw">"status"</span>:               <span class="str">"em_analise"</span>,
+    <span class="kw">"prioridade"</span>:           <span class="str">"alta"</span>,
+    <span class="kw">"origem"</span>:               <span class="str">"api"</span>,
+    <span class="kw">"ref_externa"</span>:          <span class="str">"TICKET-2024-001"</span>,
+    <span class="kw">"responsavel_nome"</span>:     <span class="str">"João Desenvolvedor"</span>,
+    <span class="kw">"criado_em"</span>:            <span class="str">"2026-08-21 09:30:00"</span>,
+    <span class="kw">"atualizado_em"</span>:        <span class="str">"2026-08-21 10:15:00"</span>,
+    <span class="kw">"historico"</span>: [
+      {
+        <span class="kw">"id"</span>:               <span class="num">2</span>,
+        <span class="kw">"status_anterior"</span>:  <span class="str">"nova"</span>,
+        <span class="kw">"status_novo"</span>:      <span class="str">"em_analise"</span>,
+        <span class="kw">"observacao"</span>:       <span class="str">"Iniciando análise de viabilidade"</span>,
+        <span class="kw">"nome_usuario"</span>:     <span class="str">"João Desenvolvedor"</span>,
+        <span class="kw">"criado_em"</span>:        <span class="str">"2026-08-21 10:15:00"</span>
+      },
+      {
+        <span class="kw">"id"</span>:               <span class="num">1</span>,
+        <span class="kw">"status_anterior"</span>:  <span class="str">null</span>,
+        <span class="kw">"status_novo"</span>:      <span class="str">"nova"</span>,
+        <span class="kw">"observacao"</span>:       <span class="str">"Criada via API"</span>,
+        <span class="kw">"nome_usuario"</span>:     <span class="str">"Sistema Externo"</span>,
+        <span class="kw">"criado_em"</span>:        <span class="str">"2026-08-21 09:30:00"</span>
+      }
+    ]
+  }
+}</pre>
+        </div>
+
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 404</span></div>
+          <pre>{ <span class="kw">"ok"</span>: <span class="str">false</span>, <span class="kw">"erro"</span>: <span class="str">"Solicitação não encontrada."</span> }</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GET Listar ── -->
+  <div class="section" id="get-listar">
+    <div class="section-title">Listar Solicitações</div>
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-url">/api/solicitacoes.php</span>
+        <span class="endpoint-desc">Lista com filtros opcionais</span>
+      </div>
+      <div class="endpoint-body">
+        <h3>Parâmetros de URL (todos opcionais)</h3>
+        <table>
+          <thead><tr><th>Parâmetro</th><th>Tipo</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code>cidade</code></td><td>string</td><td>Filtra por cidade (busca parcial)</td></tr>
+            <tr><td><code>status</code></td><td>string</td><td>Filtra por status exato</td></tr>
+            <tr><td><code>tipo</code></td><td>string</td><td><code>novo_item</code> ou <code>melhoria</code></td></tr>
+            <tr><td><code>limit</code></td><td>inteiro</td><td>Máx. de resultados — padrão: <code>100</code>, máx: <code>500</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>Requisição</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP Request</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+          <pre><span class="kw">GET</span> <span class="url">/demandas/api/solicitacoes.php?cidade=Bituruna&amp;status=nova&amp;limit=50</span>
+<span class="hd">X-Api-Token:</span> <span class="str">SEU_TOKEN_AQUI</span></pre>
+        </div>
+
+        <h3>Resposta de sucesso</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 200</span></div>
+          <pre>{
+  <span class="kw">"ok"</span>: <span class="str">true</span>,
+  <span class="kw">"total"</span>: <span class="num">2</span>,
+  <span class="kw">"solicitacoes"</span>: [
+    {
+      <span class="kw">"id"</span>:                <span class="num">15</span>,
+      <span class="kw">"tipo"</span>:              <span class="str">"melhoria"</span>,
+      <span class="kw">"titulo"</span>:            <span class="str">"Adicionar campo CPF no cadastro"</span>,
+      <span class="kw">"cidade"</span>:            <span class="str">"Bituruna"</span>,
+      <span class="kw">"nome_solicitante"</span>:  <span class="str">"Maria Souza"</span>,
+      <span class="kw">"status"</span>:            <span class="str">"nova"</span>,
+      <span class="kw">"prioridade"</span>:        <span class="str">"alta"</span>,
+      <span class="kw">"origem"</span>:            <span class="str">"api"</span>,
+      <span class="kw">"criado_em"</span>:         <span class="str">"2026-08-21 09:30:00"</span>
+    }
+  ]
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GET Cidades ── -->
+  <div class="section" id="get-cidades">
+    <div class="section-title">Listar Cidades</div>
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-url">/api/solicitacoes.php?cidades=1</span>
+        <span class="endpoint-desc">Retorna todas as cidades com contagem por status</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Ideal para montar um menu/seletor de cidades no sistema do cliente, com totais em tempo real.</p>
+
+        <h3>Requisição</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP Request</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+          <pre><span class="kw">GET</span> <span class="url">/demandas/api/solicitacoes.php?cidades=1</span>
+<span class="hd">X-Api-Token:</span> <span class="str">SEU_TOKEN_AQUI</span></pre>
+        </div>
+
+        <h3>Resposta de sucesso</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 200</span></div>
+          <pre>{
+  <span class="kw">"ok"</span>: <span class="str">true</span>,
+  <span class="kw">"total_cidades"</span>: <span class="num">3</span>,
+  <span class="kw">"cidades"</span>: [
+    {
+      <span class="kw">"cidade"</span>:                  <span class="str">"Bituruna"</span>,
+      <span class="kw">"total"</span>:                   <span class="num">12</span>,
+      <span class="kw">"novas"</span>:                   <span class="num">4</span>,
+      <span class="kw">"em_analise"</span>:              <span class="num">3</span>,
+      <span class="kw">"aprovadas"</span>:               <span class="num">2</span>,
+      <span class="kw">"em_desenvolvimento"</span>:       <span class="num">1</span>,
+      <span class="kw">"aguardando_homologacao"</span>:   <span class="num">0</span>,
+      <span class="kw">"implantadas"</span>:              <span class="num">2</span>,
+      <span class="kw">"rejeitadas"</span>:               <span class="num">0</span>,
+      <span class="kw">"canceladas"</span>:               <span class="num">0</span>
+    },
+    {
+      <span class="kw">"cidade"</span>:                  <span class="str">"Legado"</span>,
+      <span class="kw">"total"</span>:                   <span class="num">8</span>,
+      <span class="kw">"novas"</span>:                   <span class="num">2</span>,
+      <span class="kw">"em_analise"</span>:              <span class="num">1</span>,
+      <span class="kw">"aprovadas"</span>:               <span class="num">1</span>,
+      <span class="kw">"em_desenvolvimento"</span>:       <span class="num">2</span>,
+      <span class="kw">"aguardando_homologacao"</span>:   <span class="num">1</span>,
+      <span class="kw">"implantadas"</span>:              <span class="num">1</span>,
+      <span class="kw">"rejeitadas"</span>:               <span class="num">0</span>,
+      <span class="kw">"canceladas"</span>:               <span class="num">0</span>
+    }
+  ]
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GET por ref_externa ── -->
+  <div class="section" id="get-ref">
+    <div class="section-title">Buscar por Referência Externa</div>
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-url">/api/solicitacoes.php?ref_externa=X</span>
+        <span class="endpoint-desc">Busca pelo ID do sistema externo</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Útil para o sistema externo verificar o status de uma solicitação usando seu próprio identificador, sem precisar armazenar o <code>id</code> interno.</p>
+
+        <h3>Parâmetros de URL</h3>
+        <table>
+          <thead><tr><th>Parâmetro</th><th>Req.</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code>ref_externa</code></td><td><span class="req">✅</span></td><td>ID ou código do sistema externo</td></tr>
+            <tr><td><code>cidade</code></td><td><span class="opt">—</span></td><td>Filtro adicional por cidade (recomendado para evitar conflitos)</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Requisição</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP Request</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+          <pre><span class="kw">GET</span> <span class="url">/demandas/api/solicitacoes.php?ref_externa=TICKET-2024-001&cidade=Bituruna</span>
+<span class="hd">X-Api-Token:</span> <span class="str">SEU_TOKEN_AQUI</span></pre>
+        </div>
+
+        <h3>Resposta de sucesso</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 200</span></div>
+          <pre>{
+  <span class="kw">"ok"</span>: <span class="str">true</span>,
+  <span class="kw">"total"</span>: <span class="num">1</span>,
+  <span class="kw">"solicitacoes"</span>: [
+    {
+      <span class="kw">"id"</span>:               <span class="num">15</span>,
+      <span class="kw">"tipo"</span>:             <span class="str">"melhoria"</span>,
+      <span class="kw">"titulo"</span>:           <span class="str">"Adicionar campo CPF no cadastro"</span>,
+      <span class="kw">"cidade"</span>:           <span class="str">"Bituruna"</span>,
+      <span class="kw">"nome_solicitante"</span>: <span class="str">"Maria Souza"</span>,
+      <span class="kw">"status"</span>:           <span class="str">"em_analise"</span>,
+      <span class="kw">"prioridade"</span>:       <span class="str">"alta"</span>,
+      <span class="kw">"origem"</span>:           <span class="str">"api"</span>,
+      <span class="kw">"ref_externa"</span>:      <span class="str">"TICKET-2024-001"</span>,
+      <span class="kw">"criado_em"</span>:        <span class="str">"2026-08-21 09:30:00"</span>
+    }
+  ]
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PATCH Status ── -->
+  <div class="section" id="patch-status">
+    <div class="section-title">Atualizar Status</div>
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method-badge badge-patch">PATCH</span>
+        <span class="endpoint-url">/api/solicitacoes.php?id=X</span>
+        <span class="endpoint-desc">Altera o status e registra no histórico</span>
+      </div>
+      <div class="endpoint-body">
+        <h3>Parâmetros de URL</h3>
+        <table>
+          <thead><tr><th>Parâmetro</th><th>Req.</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td><span class="req">✅</span></td><td>ID da solicitação</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Campos do body (JSON)</h3>
+        <table>
+          <thead><tr><th>Campo</th><th>Req.</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code>status</code></td><td><span class="req">✅</span></td><td>Novo status (ver tabela de valores)</td></tr>
+            <tr><td><code>observacao</code></td><td><span class="opt">—</span></td><td>Comentário sobre a mudança</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Requisição</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP Request</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+          <pre><span class="kw">PATCH</span> <span class="url">/demandas/api/solicitacoes.php?id=15</span>
+<span class="hd">X-Api-Token:</span> <span class="str">SEU_TOKEN_AQUI</span>
+<span class="hd">Content-Type:</span> <span class="str">application/json</span>
+
+{
+  <span class="kw">"status"</span>:     <span class="str">"em_analise"</span>,
+  <span class="kw">"observacao"</span>: <span class="str">"Iniciando análise de viabilidade técnica."</span>
+}</pre>
+        </div>
+
+        <h3>Resposta de sucesso</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 200</span></div>
+          <pre>{
+  <span class="kw">"ok"</span>:              <span class="str">true</span>,
+  <span class="kw">"id"</span>:              <span class="num">15</span>,
+  <span class="kw">"status_anterior"</span>: <span class="str">"nova"</span>,
+  <span class="kw">"status_novo"</span>:     <span class="str">"em_analise"</span>
+}</pre>
+        </div>
+
+        <h3>Erros possíveis</h3>
+        <div class="code-block">
+          <div class="code-block-head"><span>HTTP 400 / 404</span></div>
+          <pre>{ <span class="kw">"ok"</span>: <span class="str">false</span>, <span class="kw">"erro"</span>: <span class="str">"Status inválido. Valores aceitos: nova, em_analise, aprovada..."</span> }
+{ <span class="kw">"ok"</span>: <span class="str">false</span>, <span class="kw">"erro"</span>: <span class="str">"Solicitação não encontrada."</span> }
+{ <span class="kw">"ok"</span>: <span class="str">false</span>, <span class="kw">"erro"</span>: <span class="str">"Informe ?id= na URL."</span> }</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Códigos HTTP ── -->
+  <div class="section" id="erros">
+    <div class="section-title">⚠️ Códigos de Resposta HTTP</div>
+    <table>
+      <thead><tr><th>Código</th><th>Significado</th></tr></thead>
+      <tbody>
+        <tr><td><span class="http-chip http-2">200</span> OK</td><td>Requisição bem-sucedida</td></tr>
+        <tr><td><span class="http-chip http-2">201</span> Created</td><td>Solicitação criada com sucesso</td></tr>
+        <tr><td><span class="http-chip http-2">204</span> No Content</td><td>Resposta a requisições OPTIONS (CORS preflight)</td></tr>
+        <tr><td><span class="http-chip http-4">400</span> Bad Request</td><td>Campo obrigatório ausente, valor inválido ou JSON inválido</td></tr>
+        <tr><td><span class="http-chip http-4">401</span> Unauthorized</td><td>Token ausente, inválido ou inativo</td></tr>
+        <tr><td><span class="http-chip http-4">404</span> Not Found</td><td>Solicitação não encontrada</td></tr>
+        <tr><td><span class="http-chip http-4">405</span> Method Not Allowed</td><td>Método HTTP não suportado</td></tr>
+      </tbody>
+    </table>
+    <div class="alert alert-blue">
+      ℹ️ Todas as respostas de erro seguem o formato: <code>{ "ok": false, "erro": "mensagem descritiva" }</code>
+    </div>
+  </div>
+
+  <!-- ── Fluxo ── -->
+  <div class="section" id="fluxo">
+    <div class="section-title">🔄 Fluxo de integração</div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin-bottom:16px;">
+      <div style="display:flex;flex-direction:column;gap:0;">
+        <?php
+        $steps = [
+          ['1', '#dbeafe', '#2563eb', 'Sistema externo recebe solicitação do usuário'],
+          ['2', '#f3f4f6', '#374151', 'POST /api/solicitacoes.php  →  obtém { id: 15, status: "nova" }'],
+          ['3', '#f3f4f6', '#374151', 'Salvar o id retornado no sistema externo (para consultas futuras)'],
+          ['4', '#dcfce7', '#15803d', 'Equipe interna recebe e analisa no painel de Solicitações'],
+          ['5', '#fef9c3', '#a16207', '(Opcional) GET /api/solicitacoes.php?id=15  →  verificar status atual'],
+          ['6', '#f0fdf4', '#15803d', '(Opcional) PATCH /api/solicitacoes.php?id=15  →  atualizar de outro sistema'],
+        ];
+        ?>
+      </div>
+      <ol style="padding-left:20px;display:flex;flex-direction:column;gap:12px;">
+        <li style="font-size:14px;">Sistema externo recebe a solicitação do usuário</li>
+        <li style="font-size:14px;"><code>POST /api/solicitacoes.php</code> → retorna <code>{ "id": 15, "status": "nova" }</code></li>
+        <li style="font-size:14px;">Salvar o <code>id</code> retornado no sistema externo para consultas futuras</li>
+        <li style="font-size:14px;">Equipe interna analisa e atualiza status pelo painel web</li>
+        <li style="font-size:14px;"><em>(Opcional)</em> <code>GET /api/solicitacoes.php?id=15</code> → consultar status atualizado</li>
+        <li style="font-size:14px;"><em>(Opcional)</em> <code>PATCH /api/solicitacoes.php?id=15</code> → atualizar status via API</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ── cURL ── -->
+  <div class="section" id="curl">
+    <div class="section-title">💻 Exemplos com cURL</div>
+
+    <h3>Criar solicitação</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+      <pre>curl -X POST "https://seudominio.com.br/demandas/api/solicitacoes.php" \
+  -H "X-Api-Token: SEU_TOKEN_AQUI" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tipo": "melhoria",
+    "titulo": "Novo relatório de atendimentos",
+    "cidade": "Bituruna",
+    "nome_solicitante": "Maria Souza",
+    "email_solicitante": "maria@municipio.gov.br",
+    "prioridade": "alta"
+  }'</pre>
+    </div>
+
+    <h3>Consultar detalhe</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+      <pre>curl -X GET "https://seudominio.com.br/demandas/api/solicitacoes.php?id=15" \
+  -H "X-Api-Token: SEU_TOKEN_AQUI"</pre>
+    </div>
+
+    <h3>Listar todas as cidades com contagens</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+      <pre>curl -X GET "https://seudominio.com.br/demandas/api/solicitacoes.php?cidades=1" \
+  -H "X-Api-Token: SEU_TOKEN_AQUI"</pre>
+    </div>
+
+    <h3>Listar solicitações de uma cidade</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+      <pre>curl -X GET "https://seudominio.com.br/demandas/api/solicitacoes.php?cidade=Bituruna&amp;status=nova" \
+  -H "X-Api-Token: SEU_TOKEN_AQUI"</pre>
+    </div>
+
+    <h3>Buscar por referência externa</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+      <pre>curl -X GET "https://seudominio.com.br/demandas/api/solicitacoes.php?ref_externa=TICKET-2024-001&amp;cidade=Bituruna" \
+  -H "X-Api-Token: SEU_TOKEN_AQUI"</pre>
+    </div>
+
+    <h3>Atualizar status</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+      <pre>curl -X PATCH "https://seudominio.com.br/demandas/api/solicitacoes.php?id=15" \
+  -H "X-Api-Token: SEU_TOKEN_AQUI" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "aprovada", "observacao": "Aprovado em reunião de equipe."}'</pre>
+    </div>
+  </div>
+
+  <!-- ── Tokens ── -->
+  <div class="section" id="tokens">
+    <div class="section-title">🛡️ Gerenciamento de Tokens</div>
+    <p>Os tokens são gerenciados na tabela <code>api_tokens</code> do banco de dados.</p>
+
+    <div class="alert alert-yellow">
+      ⚠️ Nunca compartilhe o token em código-fonte público ou repositórios. Trate-o como uma senha.
+    </div>
+
+    <h3>Criar novo token</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>SQL</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
+      <pre>INSERT INTO api_tokens (nome, token)
+VALUES ('Nome do Sistema', SHA2(CONCAT('api_', UUID()), 256));
+
+<span class="cm">-- Ver o token gerado:</span>
+SELECT nome, token FROM api_tokens ORDER BY id DESC LIMIT 1;</pre>
+    </div>
+
+    <h3>Listar tokens ativos</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>SQL</span></div>
+      <pre>SELECT id, nome, LEFT(token, 16) AS token_inicio, criado_em
+FROM api_tokens
+WHERE ativo = 1;</pre>
+    </div>
+
+    <h3>Desativar um token</h3>
+    <div class="code-block">
+      <div class="code-block-head"><span>SQL</span></div>
+      <pre>UPDATE api_tokens SET ativo = 0 WHERE id = 1;</pre>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px;">
+    API de Solicitações — v1.0 — Agosto 2026
+  </div>
+
+</main>
+</div>
+
+<script>
+// Scroll spy para sidebar
+const sections = document.querySelectorAll('.section');
+const navLinks = document.querySelectorAll('.nav-link');
+window.addEventListener('scroll', function(){
+  let cur = '';
+  sections.forEach(function(s){
+    if (window.scrollY >= s.offsetTop - 60) cur = s.id;
+  });
+  navLinks.forEach(function(l){
+    l.classList.toggle('active', l.getAttribute('href') === '#'+cur);
+  });
+});
+
+// Copiar código
+function copyCode(btn){
+  var pre = btn.closest('.code-block').querySelector('pre');
+  var text = pre.innerText || pre.textContent;
+  navigator.clipboard.writeText(text).then(function(){
+    btn.textContent = 'Copiado!';
+    setTimeout(function(){ btn.textContent = 'Copiar'; }, 2000);
+  });
+}
+</script>
+</body>
+</html>
