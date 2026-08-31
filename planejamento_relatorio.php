@@ -103,6 +103,23 @@ foreach ($itens as $it) {
 $totalNaoPlan = 0;
 foreach ($naoPlanejados as $np) { $totalNaoPlan += round($np['duracao_min'] / 60, 2); }
 
+// ── Totais por desenvolvedor (itens finalizados) ─────────────────────
+$porDev = array(); // [nome] = [estimado, realizado, nao_planejado]
+foreach ($itens as $it) {
+    $nome = $it['dev_nome'];
+    if (!isset($porDev[$nome])) $porDev[$nome] = array('estimado'=>0,'realizado'=>0,'nao_planejado'=>0);
+    $porDev[$nome]['estimado'] += (float)$it['estimativa_media'];
+    if ($it['status'] === 'finalizado' && !empty($it['tempo_real'])) {
+        $porDev[$nome]['realizado'] += (float)$it['tempo_real'];
+    }
+}
+foreach ($naoPlanejados as $np) {
+    $nome = $np['dev_nome'];
+    if (!isset($porDev[$nome])) $porDev[$nome] = array('estimado'=>0,'realizado'=>0,'nao_planejado'=>0);
+    $porDev[$nome]['nao_planejado'] += round($np['duracao_min'] / 60, 2);
+}
+ksort($porDev);
+
 $menuActive = 'planejamento';
 $pageTitle  = 'Relatório de Planejamento';
 require_once __DIR__ . '/includes/layout_top.php';
@@ -209,6 +226,73 @@ require_once __DIR__ . '/includes/layout_top.php';
         <div class="vsub">via suportes finalizados</div>
     </div>
 </div>
+
+<!-- ── Horas por Desenvolvedor ────────────────────────────────────── -->
+<?php if (!empty($porDev)): ?>
+<div class="section-title">👤 Horas por Desenvolvedor — itens finalizados</div>
+<div class="panel" style="padding:0;overflow:hidden;">
+    <table>
+        <thead>
+        <tr>
+            <th>Desenvolvedor</th>
+            <th style="text-align:right;">Estimado</th>
+            <th style="text-align:right;">Realizado</th>
+            <th style="text-align:right;">Não planejado</th>
+            <th style="text-align:right;">Total trabalhado</th>
+            <th style="text-align:right;">Diferença (real vs estimado)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($porDev as $devNome => $d):
+            $total = $d['realizado'] + $d['nao_planejado'];
+            $difDev = $d['realizado'] - $d['estimado'];
+        ?>
+        <tr>
+            <td style="font-weight:900;"><?= h($devNome) ?></td>
+            <td style="text-align:right;color:var(--muted);"><?= number_format($d['estimado'],1) ?>h</td>
+            <td style="text-align:right;font-weight:900;"><?= number_format($d['realizado'],1) ?>h</td>
+            <td style="text-align:right;color:#b45309;font-weight:900;"><?= number_format($d['nao_planejado'],1) ?>h</td>
+            <td style="text-align:right;font-weight:900;font-size:15px;"><?= number_format($total,1) ?>h</td>
+            <td style="text-align:right;">
+                <?php if ($d['realizado'] > 0): ?>
+                    <span class="<?= $difDev > 0 ? 'neg' : 'pos' ?>">
+                        <?= ($difDev > 0 ? '+' : '') . number_format($difDev,1) ?>h
+                    </span>
+                <?php else: ?>
+                    <span class="muted">—</span>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+        <tr style="background:#f9fafb;">
+            <?php
+                $sumEst  = array_sum(array_column($porDev,'estimado'));
+                $sumReal = array_sum(array_column($porDev,'realizado'));
+                $sumNp   = array_sum(array_column($porDev,'nao_planejado'));
+                $sumTot  = $sumReal + $sumNp;
+                $sumDif  = $sumReal - $sumEst;
+            ?>
+            <td style="font-weight:900;">Total</td>
+            <td style="text-align:right;color:var(--muted);font-weight:900;"><?= number_format($sumEst,1) ?>h</td>
+            <td style="text-align:right;font-weight:900;"><?= number_format($sumReal,1) ?>h</td>
+            <td style="text-align:right;color:#b45309;font-weight:900;"><?= number_format($sumNp,1) ?>h</td>
+            <td style="text-align:right;font-weight:900;font-size:15px;"><?= number_format($sumTot,1) ?>h</td>
+            <td style="text-align:right;">
+                <?php if ($sumReal > 0): ?>
+                    <span class="<?= $sumDif > 0 ? 'neg' : 'pos' ?>" style="font-weight:900;">
+                        <?= ($sumDif > 0 ? '+' : '') . number_format($sumDif,1) ?>h
+                    </span>
+                <?php else: ?>
+                    <span class="muted">—</span>
+                <?php endif; ?>
+            </td>
+        </tr>
+        </tfoot>
+    </table>
+</div>
+<?php endif; ?>
 
 <!-- ── Tabela de itens planejados ────────────────────────────────── -->
 <div class="section-title">📋 Itens Planejados</div>
