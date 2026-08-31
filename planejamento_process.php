@@ -45,28 +45,10 @@ function proximoDiaUtil($ts) {
     return $ts;
 }
 
-// Retorna próximo dia útil disponível para o dev a partir de amanhã (respeita limite de 8h)
+// Retorna o próximo dia útil a partir de hoje
 function calcularDataAlocacao($pdo, $id_dev, $media) {
-    $ts = mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y')); // hoje
-    for ($tentativa = 0; $tentativa < 365; $tentativa++) {
-        $ts  = proximoDiaUtil($ts);
-        $dia = date('Y-m-d', $ts);
-        $st  = $pdo->prepare("
-            SELECT COALESCE(SUM(pi.estimativa_media), 0) AS horas
-            FROM planejamento_calendario pc
-            JOIN planejamento_itens pi ON pi.id = pc.id_item
-            WHERE pc.id_desenvolvedor = ?
-              AND pc.data_alocada = ?
-              AND pi.ativo = 1
-              AND pi.status <> 'finalizado'
-        ");
-        $st->execute(array((int)$id_dev, $dia));
-        $horas = (float)$st->fetchColumn();
-        if ($horas + $media <= 8.0) {
-            return $dia;
-        }
-    }
-    return date('Y-m-d', $ts);
+    $ts = mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y'));
+    return date('Y-m-d', proximoDiaUtil($ts));
 }
 
 function proximaOrdem($pdo, $id_dev, $data) {
