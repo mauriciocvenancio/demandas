@@ -73,10 +73,10 @@ if ($id_dev_fil > 0) {
 $stmtDem = $pdo->prepare("
     SELECT
         d.titulo,
-        30                      AS duracao_min,
-        DATE(d.atualizado_em)   AS data_np,
-        u.nome                  AS dev_nome,
-        'Demanda'               AS origem
+        COALESCE(d.duracao_min, 30) AS duracao_min,
+        DATE(d.atualizado_em)       AS data_np,
+        u.nome                      AS dev_nome,
+        'Demanda'                   AS origem
     FROM demandas d
     JOIN usuarios u ON u.id = d.id_responsavel
     WHERE " . implode(" AND ", $whereDem) . "

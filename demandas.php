@@ -486,6 +486,20 @@ function diasCriacao($criado_em, $prazo){
                     </div>
                 </div>
 
+                <div class="grid">
+                    <div>
+                        <label>Horas trabalhadas</label>
+                        <input type="number" name="duracao_min" min="0" step="0.5"
+                               placeholder="ex: 1.5"
+                               style="width:100%;"
+                               oninput="this.value=this.value.replace(',','.')">
+                        <div style="font-size:11px;color:var(--muted);margin-top:4px;font-weight:700;">
+                            Quando finalizado, aparece no Planejamento como hora não planejada
+                        </div>
+                    </div>
+                    <div></div>
+                </div>
+
                 <div class="grid grid-1">
                     <div>
                         <label>Descrição</label>

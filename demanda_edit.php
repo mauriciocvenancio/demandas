@@ -194,6 +194,23 @@ function isImageExt($filename){
             </div>
         </div>
 
+        <div class="grid">
+            <div>
+                <label>Horas trabalhadas</label>
+                <?php
+                    $duracaoHoras = !empty($demanda['duracao_min']) ? round((float)$demanda['duracao_min'] / 60, 2) : '';
+                ?>
+                <input type="number" name="duracao_min" min="0" step="0.5"
+                       value="<?= h($duracaoHoras) ?>"
+                       placeholder="ex: 1.5"
+                       oninput="this.value=this.value.replace(',','.')">
+                <div style="font-size:11px;color:var(--muted);margin-top:4px;font-weight:700;">
+                    Quando finalizado, aparece no Planejamento como hora não planejada
+                </div>
+            </div>
+            <div></div>
+        </div>
+
         <div class="grid grid-1">
             <div>
                 <label>Descrição</label>

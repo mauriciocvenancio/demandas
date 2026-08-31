@@ -133,14 +133,17 @@ if ($action === 'create') {
     if (!in_array($tipo_demanda, $allowedTipo, true)) $tipo_demanda = null;
     $nome_solicitante = ($tipo_demanda === 'solicitacao_novo_item' && post('nome_solicitante') !== '')
                         ? post('nome_solicitante') : null;
+    $duracao_raw  = post('duracao_min');
+    $duracao_min  = ($duracao_raw !== '' && is_numeric($duracao_raw) && (float)$duracao_raw > 0)
+                    ? (int)round((float)$duracao_raw * 60) : null;
 
     if ($titulo === '') redirect('/demandas.php?msg=titulo_obrigatorio');
     if ($id_cliente <= 0) redirect('/demandas.php?msg=cliente_obrigatorio');
 
     $stmt = $pdo->prepare("
         INSERT INTO demandas
-        (titulo, descricao, id_cliente, id_responsavel, status, criticidade, prazo, tipo_demanda, nome_solicitante, ativo, criado_em)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
+        (titulo, descricao, id_cliente, id_responsavel, status, criticidade, prazo, tipo_demanda, nome_solicitante, duracao_min, ativo, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
     ");
     $stmt->execute(array(
         $titulo,
@@ -151,7 +154,8 @@ if ($action === 'create') {
         $criticidade,
         $prazoDb,
         $tipo_demanda,
-        $nome_solicitante
+        $nome_solicitante,
+        $duracao_min
     ));
 
     $id_demanda = (int)$pdo->lastInsertId();
@@ -186,6 +190,9 @@ if ($action === 'create') {
     if (!in_array($tipo_demanda, $allowedTipo, true)) $tipo_demanda = null;
     $nome_solicitante = ($tipo_demanda === 'solicitacao_novo_item' && post('nome_solicitante') !== '')
                         ? post('nome_solicitante') : null;
+    $duracao_raw  = post('duracao_min');
+    $duracao_min  = ($duracao_raw !== '' && is_numeric($duracao_raw) && (float)$duracao_raw > 0)
+                    ? (int)round((float)$duracao_raw * 60) : null;
 
     if ($id <= 0) redirect('/demandas.php?msg=id_invalido');
     if ($titulo === '') redirect('/demanda_edit.php?id='.$id.'&msg=titulo_obrigatorio');
@@ -200,7 +207,7 @@ if ($action === 'create') {
     $st = $pdo->prepare("
         UPDATE demandas
         SET titulo=?, descricao=?, id_cliente=?, id_responsavel=?, status=?, criticidade=?, prazo=?,
-            tipo_demanda=?, nome_solicitante=?, atualizado_em=NOW()
+            tipo_demanda=?, nome_solicitante=?, duracao_min=?, atualizado_em=NOW()
         WHERE id=?
         LIMIT 1
     ");
@@ -214,6 +221,7 @@ if ($action === 'create') {
         $prazoDb,
         $tipo_demanda,
         $nome_solicitante,
+        $duracao_min,
         $id
     ));
 

@@ -117,9 +117,10 @@ foreach ($stmtSup->fetchAll() as $s) {
 // ── Itens não planejados: demandas finalizadas ────────────────────────
 $stmtDem = $pdo->prepare("
     SELECT
-        DATE(d.atualizado_em)  AS data_np,
-        d.id_responsavel       AS id_dev,
-        d.titulo
+        DATE(d.atualizado_em)           AS data_np,
+        d.id_responsavel                AS id_dev,
+        d.titulo,
+        COALESCE(d.duracao_min, 30)     AS duracao_min
     FROM demandas d
     WHERE d.ativo = 1
       AND d.status = 'finalizado'
@@ -135,7 +136,7 @@ foreach ($stmtDem->fetchAll() as $dem) {
     if (!isset($naoPlanejados[$did][$data])) $naoPlanejados[$did][$data] = array();
     $naoPlanejados[$did][$data][] = array(
         'titulo'     => $dem['titulo'],
-        'duracao_min'=> 30,
+        'duracao_min'=> (int)$dem['duracao_min'],
         'origem'     => 'demanda',
     );
 }
@@ -344,6 +345,7 @@ require_once __DIR__ . '/includes/layout_top.php';
 
                     <div class="pc-menu" id="menu-<?= $cardId ?>">
                         <?php if ($item['status'] !== 'finalizado'): ?>
+                            <button onclick="abrirEditar(<?= (int)$item['id'] ?>, <?= h(json_encode($item['titulo'])) ?>, <?= h(json_encode((string)$item['descricao'])) ?>, <?= (int)$item['id_desenvolvedor'] ?>, <?= (float)$item['estimativa_min'] ?>, <?= (float)$item['estimativa_max'] ?>)">✏️ Editar</button>
                             <button onclick="abrirFinalizar(<?= (int)$item['id'] ?>, '<?= h($item['titulo']) ?>')">✅ Finalizar</button>
                         <?php endif; ?>
                         <button onclick="excluirItem(<?= (int)$item['id'] ?>)">🗑 Remover</button>
@@ -428,6 +430,56 @@ require_once __DIR__ . '/includes/layout_top.php';
     </div>
 </div>
 
+<!-- ── Modal: Editar Item ────────────────────────────────────────── -->
+<div class="modal-bd" id="modalEditar" onclick="if(event.target===this)fecharEditar()">
+    <div class="modal-box">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title">Editar Item</div>
+                <div class="modal-sub">Disponível apenas antes de finalizar</div>
+            </div>
+            <button class="modal-close" onclick="fecharEditar()">×</button>
+        </div>
+
+        <input type="hidden" id="e_id">
+        <div class="field">
+            <label>Título *</label>
+            <input type="text" id="e_titulo">
+        </div>
+        <div class="field">
+            <label>Descrição</label>
+            <textarea id="e_descricao"></textarea>
+        </div>
+        <div class="field">
+            <label>Desenvolvedor *</label>
+            <select id="e_dev">
+                <option value="">Selecione</option>
+                <?php foreach ($devs as $dev): ?>
+                    <option value="<?= (int)$dev['id'] ?>"><?= h($dev['nome']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="est-row">
+            <div class="field">
+                <label>Estimativa mín (h) *</label>
+                <input type="number" id="e_est_min" min="0.5" step="0.5">
+            </div>
+            <div class="field">
+                <label>Estimativa máx (h) *</label>
+                <input type="number" id="e_est_max" min="0.5" step="0.5">
+            </div>
+            <div class="field">
+                <label>Média calculada</label>
+                <div class="est-media" id="e_media">—</div>
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button class="btn" onclick="fecharEditar()">Cancelar</button>
+            <button class="btn btn-dark" id="btnSalvarEditar" onclick="salvarEditar()">Salvar Alterações</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── Modal: Finalizar Item ─────────────────────────────────────── -->
 <div class="modal-bd" id="modalFin" onclick="if(event.target===this)fecharFinalizar()">
     <div class="modal-fin-box">
@@ -475,25 +527,25 @@ function onDrop(e, devId, data) {
     fd.append('id_item', dragItemId);
     fd.append('nova_data', data);
 
-    fetch('planejamento_process.php', {method:'POST', body:fd})
+    // Feedback visual imediato: move o card na tela enquanto aguarda servidor
+    var destBody = col.querySelector('.col-body');
+    if (dragCardEl && destBody) {
+        var npCards = destBody.querySelectorAll('.nao-plan-card');
+        if (npCards.length > 0) {
+            destBody.insertBefore(dragCardEl, npCards[0]);
+        } else {
+            destBody.appendChild(dragCardEl);
+        }
+        dragCardEl.style.opacity = '0.5';
+    }
+
+    fetch('planejamento_process.php', {method:'POST', body:fd, credentials:'same-origin'})
         .then(function(r){ return r.json(); })
         .then(function(res) {
-            if (!res.ok) { alert(res.msg); return; }
-            // Mover card no DOM
-            var body = col.querySelector('.col-body');
-            if (dragCardEl && body) {
-                // Inserir antes dos cards não-planejados (nao-plan-card)
-                var npCards = body.querySelectorAll('.nao-plan-card');
-                if (npCards.length > 0) {
-                    body.insertBefore(dragCardEl, npCards[0]);
-                } else {
-                    body.appendChild(dragCardEl);
-                }
-            }
-            recalcHoras();
-            dragItemId = null; dragCardEl = null;
+            if (!res.ok) { alert(res.msg); window.location.reload(); return; }
+            window.location.reload();
         })
-        .catch(function(){ alert('Erro de comunicação.'); });
+        .catch(function(){ alert('Erro de comunicação.'); window.location.reload(); });
 }
 
 function recalcHoras() {
@@ -564,7 +616,7 @@ function salvarItem() {
     fd.append('estimativa_min', estMin);
     fd.append('estimativa_max', estMax);
 
-    fetch('planejamento_process.php', {method:'POST', body:fd})
+    fetch('planejamento_process.php', {method:'POST', body:fd, credentials:'same-origin'})
         .then(function(r){ return r.json(); })
         .then(function(res) {
             btn.disabled = false; btn.textContent = 'Agendar Item';
@@ -573,6 +625,65 @@ function salvarItem() {
             window.location.reload();
         })
         .catch(function(){ btn.disabled=false; btn.textContent='Agendar Item'; alert('Erro de comunicação.'); });
+}
+
+// ── Modal Editar ─────────────────────────────────────────────────────
+function abrirEditar(id, titulo, descricao, devId, estMin, estMax) {
+    closeAllCardMenus();
+    document.getElementById('e_id').value       = id;
+    document.getElementById('e_titulo').value   = titulo;
+    document.getElementById('e_descricao').value= descricao || '';
+    document.getElementById('e_dev').value      = devId;
+    document.getElementById('e_est_min').value  = estMin;
+    document.getElementById('e_est_max').value  = estMax;
+    calcMediaEditar();
+    document.getElementById('modalEditar').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('e_titulo').focus(); }, 80);
+}
+function fecharEditar() { document.getElementById('modalEditar').style.display = 'none'; }
+
+function calcMediaEditar() {
+    var mn = parseFloat(document.getElementById('e_est_min').value) || 0;
+    var mx = parseFloat(document.getElementById('e_est_max').value) || 0;
+    document.getElementById('e_media').textContent = (mn > 0 || mx > 0) ? ((mn+mx)/2).toFixed(1)+'h' : '—';
+}
+document.getElementById('e_est_min').addEventListener('input', calcMediaEditar);
+document.getElementById('e_est_max').addEventListener('input', calcMediaEditar);
+
+function salvarEditar() {
+    var id     = document.getElementById('e_id').value;
+    var titulo = document.getElementById('e_titulo').value.trim();
+    var descr  = document.getElementById('e_descricao').value.trim();
+    var devId  = document.getElementById('e_dev').value;
+    var estMin = document.getElementById('e_est_min').value;
+    var estMax = document.getElementById('e_est_max').value;
+
+    if (!titulo)            { alert('Informe o título.'); return; }
+    if (!devId)             { alert('Selecione o desenvolvedor.'); return; }
+    if (!estMin || !estMax) { alert('Informe as estimativas.'); return; }
+
+    var btn = document.getElementById('btnSalvarEditar');
+    btn.disabled = true; btn.textContent = 'Salvando...';
+
+    var fd = new FormData();
+    fd.append('csrf', CSRF);
+    fd.append('action', 'edit');
+    fd.append('id_item', id);
+    fd.append('titulo', titulo);
+    fd.append('descricao', descr);
+    fd.append('id_desenvolvedor', devId);
+    fd.append('estimativa_min', estMin);
+    fd.append('estimativa_max', estMax);
+
+    fetch('planejamento_process.php', {method:'POST', body:fd, credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(res) {
+            btn.disabled = false; btn.textContent = 'Salvar Alterações';
+            if (!res.ok) { alert(res.msg); return; }
+            fecharEditar();
+            window.location.reload();
+        })
+        .catch(function(){ btn.disabled=false; btn.textContent='Salvar Alterações'; alert('Erro de comunicação.'); });
 }
 
 // ── Modal Finalizar ──────────────────────────────────────────────────
@@ -598,7 +709,7 @@ function confirmarFinalizar() {
     fd.append('id_item', finItemId);
     fd.append('tempo_real', tempo);
 
-    fetch('planejamento_process.php', {method:'POST', body:fd})
+    fetch('planejamento_process.php', {method:'POST', body:fd, credentials:'same-origin'})
         .then(function(r){ return r.json(); })
         .then(function(res) {
             btn.disabled = false;
@@ -618,7 +729,7 @@ function excluirItem(id) {
     fd.append('action', 'delete');
     fd.append('id_item', id);
 
-    fetch('planejamento_process.php', {method:'POST', body:fd})
+    fetch('planejamento_process.php', {method:'POST', body:fd, credentials:'same-origin'})
         .then(function(r){ return r.json(); })
         .then(function(res) {
             if (!res.ok) { alert(res.msg); return; }
