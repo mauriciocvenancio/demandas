@@ -120,6 +120,62 @@ foreach ($naoPlanejados as $np) {
 }
 ksort($porDev);
 
+// ── Texto para WhatsApp ───────────────────────────────────────────────
+$wppDevFiltro = $id_dev_fil > 0
+    ? array_reduce($devs, function($c,$d) use($id_dev_fil){ return $d['id']==$id_dev_fil ? $d['nome'] : $c; }, 'Todos')
+    : 'Todos';
+
+$wpp  = "*📅 Relatório de Planejamento*\n";
+$wpp .= "Período: " . date('d/m/Y', strtotime($data_ini)) . " a " . date('d/m/Y', strtotime($data_fim)) . "\n";
+$wpp .= "Desenvolvedor: " . $wppDevFiltro . "\n\n";
+
+$wpp .= "*📊 Resumo geral*\n";
+$wpp .= "• Itens planejados: " . $totalItens . "\n";
+$wpp .= "• Total estimado: " . number_format($totalEstimado, 1) . "h\n";
+$wpp .= "• Total realizado: " . number_format($totalRealizado, 1) . "h (" . $totalFinaliz . " finalizado(s))\n";
+$diff = $totalRealizado - $totalEstimado;
+$wpp .= "• Diferença: " . ($diff > 0 ? '+' : '') . number_format($diff, 1) . "h\n";
+$wpp .= "• Horas não planejadas: " . number_format($totalNaoPlan, 1) . "h\n";
+
+if (!empty($porDev)) {
+    $wpp .= "\n*👤 Por Desenvolvedor*\n";
+    foreach ($porDev as $devNome => $d) {
+        $tot = $d['realizado'] + $d['nao_planejado'];
+        if ($d['estimado'] == 0 && $tot == 0) continue;
+        $wpp .= "• " . $devNome . ": ";
+        $wpp .= "Real " . number_format($d['realizado'],1) . "h";
+        if ($d['nao_planejado'] > 0) $wpp .= " + NP " . number_format($d['nao_planejado'],1) . "h";
+        $wpp .= " = " . number_format($tot,1) . "h";
+        if ($d['realizado'] > 0) {
+            $dif = $d['realizado'] - $d['estimado'];
+            $wpp .= " (" . ($dif > 0 ? '+' : '') . number_format($dif,1) . "h vs estimado)";
+        }
+        $wpp .= "\n";
+    }
+}
+
+$finalizados = array_filter($itens, function($it){ return $it['status'] === 'finalizado'; });
+if (!empty($finalizados)) {
+    $wpp .= "\n*✅ Itens finalizados (planejados)*\n";
+    $n = 1;
+    foreach ($finalizados as $it) {
+        $wpp .= $n++ . ". " . $it['titulo'] . "\n";
+        $wpp .= "   Dev: " . $it['dev_nome'] . " · Real: " . number_format((float)$it['tempo_real'],1) . "h\n";
+    }
+}
+
+// apenas itens com duracao > 0 (ou seja, que foram realmente finalizados com tempo registrado)
+$npFinalizados = array_filter($naoPlanejados, function($np){ return (int)$np['duracao_min'] > 0; });
+if (!empty($npFinalizados)) {
+    $wpp .= "\n*⚡ Não planejados finalizados*\n";
+    $n = 1;
+    foreach ($npFinalizados as $np) {
+        $origem = $np['origem'] === 'Demanda' ? '📋' : '🎧';
+        $wpp .= $n++ . ". " . $origem . " " . $np['titulo'] . "\n";
+        $wpp .= "   Dev: " . $np['dev_nome'] . " · " . number_format($np['duracao_min']/60, 1) . "h · " . date('d/m', strtotime($np['data_np'])) . "\n";
+    }
+}
+
 $menuActive = 'planejamento';
 $pageTitle  = 'Relatório de Planejamento';
 require_once __DIR__ . '/includes/layout_top.php';
@@ -164,7 +220,10 @@ require_once __DIR__ . '/includes/layout_top.php';
         <h1>Relatório de Planejamento</h1>
         <div class="sub">Horas planejadas × realizadas e horas não planejadas (suportes)</div>
     </div>
-    <a class="btn" href="planejamento.php">← Calendário</a>
+    <div style="display:flex;gap:8px;">
+        <button class="btn" type="button" onclick="abrirResumoWpp()">📲 Resumo WhatsApp</button>
+        <a class="btn" href="planejamento.php">← Calendário</a>
+    </div>
 </div>
 
 <form class="filters" method="get">
@@ -393,5 +452,58 @@ require_once __DIR__ . '/includes/layout_top.php';
         </div>
     <?php endif; ?>
 </div>
+
+<!-- Modal Resumo WhatsApp -->
+<div id="wppModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:18px;width:min(600px,96vw);max-height:90vh;display:flex;flex-direction:column;padding:20px;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+                <div style="font-size:17px;font-weight:900;">📲 Resumo para WhatsApp</div>
+                <div style="font-size:12px;color:var(--muted);font-weight:700;margin-top:3px;">Copie o texto ou abra direto no WhatsApp Web</div>
+            </div>
+            <button onclick="fecharResumoWpp()" style="border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;cursor:pointer;font-size:18px;font-weight:900;">×</button>
+        </div>
+        <textarea id="wppTexto" readonly style="flex:1;min-height:340px;resize:vertical;border:1px solid var(--line);border-radius:14px;padding:14px;font-size:13px;font-family:inherit;line-height:1.6;outline:none;"></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button class="btn" onclick="fecharResumoWpp()">Fechar</button>
+            <button class="btn" id="btnCopiar" onclick="copiarWpp()">📋 Copiar texto</button>
+            <button class="btn btn-dark" onclick="abrirWhatsApp()">💬 Abrir WhatsApp Web</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var wppTextoOriginal = <?= json_encode($wpp) ?>;
+
+function abrirResumoWpp(){
+    document.getElementById('wppTexto').value = wppTextoOriginal;
+    document.getElementById('btnCopiar').textContent = '📋 Copiar texto';
+    document.getElementById('wppModal').style.display = 'flex';
+}
+function fecharResumoWpp(){
+    document.getElementById('wppModal').style.display = 'none';
+}
+function copiarWpp(){
+    var ta = document.getElementById('wppTexto');
+    ta.select(); ta.setSelectionRange(0, 99999);
+    try {
+        document.execCommand('copy');
+        document.getElementById('btnCopiar').textContent = '✅ Copiado!';
+        setTimeout(function(){ document.getElementById('btnCopiar').textContent = '📋 Copiar texto'; }, 2000);
+    } catch(e) {
+        navigator.clipboard.writeText(ta.value).then(function(){
+            document.getElementById('btnCopiar').textContent = '✅ Copiado!';
+            setTimeout(function(){ document.getElementById('btnCopiar').textContent = '📋 Copiar texto'; }, 2000);
+        });
+    }
+}
+function abrirWhatsApp(){
+    var texto = document.getElementById('wppTexto').value;
+    var url = 'https://web.whatsapp.com/send?text=' + encodeURIComponent(texto);
+    window.open(url, '_blank');
+}
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') fecharResumoWpp(); });
+document.getElementById('wppModal').addEventListener('click', function(e){ if (e.target === this) fecharResumoWpp(); });
+</script>
 
 <?php require_once __DIR__ . '/includes/layout_bottom.php'; ?>

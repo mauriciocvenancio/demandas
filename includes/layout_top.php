@@ -9,6 +9,30 @@ $u = auth_user();
 $menuActive = isset($menuActive) ? $menuActive : 'dashboard';
 $pageTitle  = isset($pageTitle) ? $pageTitle : 'Dashboard';
 
+// Garante conexão disponível (algumas páginas incluem layout_top antes de definir $pdo)
+if (!isset($pdo)) { $pdo = db(); }
+
+// Notificações não lidas do usuário logado
+$_notifCount = 0;
+$_notifs     = array();
+$_pendPlanos = 0;
+if ($u) {
+    try {
+        $stmtN = $pdo->prepare("SELECT id, mensagem, link, criado_em FROM notificacoes WHERE id_usuario=? AND lida=0 ORDER BY criado_em DESC LIMIT 10");
+        $stmtN->execute(array((int)$u['id']));
+        $_notifs     = $stmtN->fetchAll();
+        $_notifCount = count($_notifs);
+    } catch (Exception $e) { $_notifs = array(); }
+    // Planos pendentes de aprovação (apenas para desenvolvedores)
+    if ($u['tipo'] === 'desenvolvedor') {
+        try {
+            $stmtP = $pdo->query("SELECT COUNT(*) FROM planos_aprovacao WHERE status='pendente' AND ativo=1");
+            $_pendPlanos  = (int)$stmtP->fetchColumn();
+            $_notifCount += $_pendPlanos;
+        } catch (Exception $e) { $_pendPlanos = 0; }
+    }
+}
+
 function menuItem($key, $label, $href, $icon, $activeKey){
     $active = ($key === $activeKey) ? 'active' : '';
     echo '<a class="nav-item '.$active.'" href="'.$href.'">
@@ -252,7 +276,8 @@ function menuItem($key, $label, $href, $icon, $activeKey){
                 menuItem('relatorios',    'Relatórios',      'relatorios.php',     '📊', $menuActive);
                 menuItem('fila_demandas', 'Fila de Demandas','fila_demandas.php',  '📌', $menuActive);
                 menuItem('graficos',       'Gráficos',          'graficos.php',        '📈', $menuActive);
-                menuItem('planejamento',  'Planejamento',      'planejamento.php',    '📅', $menuActive);
+                menuItem('planejamento',      'Planejamento',       'planejamento.php',       '📅', $menuActive);
+                menuItem('planos_aprovacao',  'Planos p/ Aprovação','planos_aprovacao.php',   '📄', $menuActive);
                 menuItem('solicitacoes',  'Solicitações',      'solicitacoes.php',    '💡', $menuActive);
             }
             ?>
@@ -274,10 +299,68 @@ function menuItem($key, $label, $href, $icon, $activeKey){
     <main class="main">
         <header class="topbar">
             <div></div>
-            <div class="right">
-                <button class="iconbtn" title="Notificações">🔔</button>
+            <div class="right" style="position:relative;">
+                <!-- Sino de notificações -->
+                <button class="iconbtn" title="Notificações" id="bellBtn" onclick="toggleBell()" style="position:relative;">
+                    🔔
+                    <?php if ($_notifCount > 0): ?>
+                    <span id="bellBadge" style="position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:10px;font-weight:900;border-radius:999px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;"><?= $_notifCount ?></span>
+                    <?php endif; ?>
+                </button>
+                <!-- Dropdown notificações -->
+                <div id="bellDropdown" style="display:none;position:absolute;right:0;top:44px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.14);width:320px;z-index:9999;overflow:hidden;">
+                    <div style="padding:12px 16px;font-weight:900;font-size:13px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
+                        <span>🔔 Notificações</span>
+                        <?php if ($_notifCount > 0): ?>
+                        <button onclick="marcarLidas()" style="font-size:11px;font-weight:700;color:var(--primary);background:none;border:none;cursor:pointer;">Marcar como lidas</button>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ($u['tipo'] === 'desenvolvedor' && $_pendPlanos > 0):
+                        $pendPlanos = $_pendPlanos;
+                        if (true): ?>
+                    <a href="planos_aprovacao.php" style="display:flex;gap:10px;padding:12px 16px;text-decoration:none;color:inherit;border-bottom:1px solid var(--line);background:#fffbeb;">
+                        <span style="font-size:20px;">📄</span>
+                        <div>
+                            <div style="font-weight:800;font-size:13px;"><?= $pendPlanos ?> plano(s) aguardando aprovação</div>
+                            <div style="font-size:11px;color:var(--muted);">Clique para revisar</div>
+                        </div>
+                    </a>
+                    <?php endif; endif; ?>
+                    <?php if (empty($_notifs) && $_pendPlanos === 0): ?>
+                    <div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;font-weight:700;">Nenhuma notificação</div>
+                    <?php else: ?>
+                    <?php foreach ($_notifs as $nf): ?>
+                    <a href="<?= h(isset($nf['link']) ? $nf['link'] : '#') ?>" style="display:flex;gap:10px;padding:12px 16px;text-decoration:none;color:inherit;border-bottom:1px solid var(--line);background:#f0f9ff;">
+                        <span style="font-size:18px;margin-top:2px;">🔔</span>
+                        <div>
+                            <div style="font-size:13px;font-weight:700;line-height:1.4;"><?= h($nf['mensagem']) ?></div>
+                            <div style="font-size:11px;color:var(--muted);margin-top:2px;"><?= date('d/m H:i', strtotime($nf['criado_em'])) ?></div>
+                        </div>
+                    </a>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
                 <button class="iconbtn" title="Ajuda">❔</button>
             </div>
         </header>
+<script>
+function toggleBell(){
+    var d = document.getElementById('bellDropdown');
+    d.style.display = d.style.display === 'none' ? 'block' : 'none';
+}
+function marcarLidas(){
+    var CSRF = '<?= isset($_SESSION['csrf']) ? $_SESSION['csrf'] : '' ?>';
+    var fd = new FormData();
+    fd.append('csrf', CSRF); fd.append('action','marcar_lidas');
+    fetch('planos_aprovacao_process.php',{method:'POST',body:fd,credentials:'same-origin'})
+        .then(function(r){return r.json();})
+        .then(function(){ document.getElementById('bellBadge') && (document.getElementById('bellBadge').style.display='none'); document.getElementById('bellDropdown').style.display='none'; window.location.reload(); });
+}
+document.addEventListener('click', function(e){
+    var btn = document.getElementById('bellBtn');
+    var dd  = document.getElementById('bellDropdown');
+    if (btn && dd && !btn.contains(e.target) && !dd.contains(e.target)) dd.style.display = 'none';
+});
+</script>
 
         <section class="content">

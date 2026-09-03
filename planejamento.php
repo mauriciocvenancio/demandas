@@ -201,6 +201,36 @@ require_once __DIR__ . '/includes/layout_top.php';
         border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fff;
         font-size:12px;cursor:grab;user-select:none;position:relative;
     }
+
+    /* ── Tooltip de descrição ── */
+    .plan-card .pc-tooltip{
+        display:none;
+        position:absolute;
+        left:calc(100% + 8px);
+        top:0;
+        z-index:400;
+        background:#1e293b;
+        color:#f8fafc;
+        font-size:12px;
+        font-weight:600;
+        line-height:1.5;
+        padding:10px 13px;
+        border-radius:10px;
+        min-width:220px;
+        max-width:300px;
+        box-shadow:0 8px 24px rgba(0,0,0,.18);
+        pointer-events:none;
+        white-space:pre-wrap;
+        word-break:break-word;
+    }
+    .plan-card .pc-tooltip::before{
+        content:'';
+        position:absolute;
+        right:100%;top:14px;
+        border:6px solid transparent;
+        border-right-color:#1e293b;
+    }
+    .plan-card:hover .pc-tooltip{display:block;}
     .plan-card:active{cursor:grabbing;}
     .plan-card.finalizado{background:#f0fdf4;border-color:#86efac;}
     .plan-card .pc-title{font-weight:900;font-size:13px;margin-bottom:4px;padding-right:22px;}
@@ -326,6 +356,10 @@ require_once __DIR__ . '/includes/layout_top.php';
                      draggable="true"
                      ondragstart="onDragStart(event, <?= (int)$item['id'] ?>)">
 
+                    <?php if (!empty($item['descricao'])): ?>
+                    <div class="pc-tooltip"><?= h($item['descricao']) ?></div>
+                    <?php endif; ?>
+
                     <div class="pc-title"><?= h($item['titulo']) ?></div>
                     <div class="pc-est">
                         Est: <?= number_format((float)$item['estimativa_min'],1) ?>h ~
@@ -347,6 +381,7 @@ require_once __DIR__ . '/includes/layout_top.php';
                         <?php if ($item['status'] !== 'finalizado'): ?>
                             <button onclick="abrirEditar(<?= (int)$item['id'] ?>, <?= h(json_encode($item['titulo'])) ?>, <?= h(json_encode((string)$item['descricao'])) ?>, <?= (int)$item['id_desenvolvedor'] ?>, <?= (float)$item['estimativa_min'] ?>, <?= (float)$item['estimativa_max'] ?>)">✏️ Editar</button>
                             <button onclick="abrirFinalizar(<?= (int)$item['id'] ?>, '<?= h($item['titulo']) ?>')">✅ Finalizar</button>
+                            <button onclick="moverProximaSemana(<?= (int)$item['id'] ?>, '<?= $item['data_alocada'] ?>')">📅 Próxima semana</button>
                         <?php endif; ?>
                         <button onclick="excluirItem(<?= (int)$item['id'] ?>)">🗑 Remover</button>
                     </div>
@@ -718,6 +753,34 @@ function confirmarFinalizar() {
             window.location.reload();
         })
         .catch(function(){ btn.disabled=false; alert('Erro de comunicação.'); });
+}
+
+// ── Mover para próxima semana ─────────────────────────────────────────
+function moverProximaSemana(id, dataAtual) {
+    closeAllCardMenus();
+    // Calcula a próxima segunda-feira a partir de dataAtual
+    var parts = dataAtual.split('-');
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    var dow = d.getDay(); // 0=dom, 1=seg, ..., 5=sex, 6=sab
+    var diasAteSegunda = (8 - dow) % 7 || 7; // dias até a próxima segunda
+    d.setDate(d.getDate() + diasAteSegunda);
+    var m   = d.getMonth() + 1;
+    var dia = d.getDate();
+    var novaData = d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (dia < 10 ? '0' + dia : dia);
+
+    var fd = new FormData();
+    fd.append('csrf', CSRF);
+    fd.append('action', 'move');
+    fd.append('id_item', id);
+    fd.append('nova_data', novaData);
+
+    fetch('planejamento_process.php', {method:'POST', body:fd, credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(res) {
+            if (!res.ok) { alert(res.msg); return; }
+            window.location.reload();
+        })
+        .catch(function(){ alert('Erro de comunicação.'); });
 }
 
 // ── Excluir ──────────────────────────────────────────────────────────
