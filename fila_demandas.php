@@ -189,6 +189,33 @@ require_once __DIR__ . '/includes/layout_top.php';
 
         /* cards de tipo */
         .tipo-cards{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
+
+        /* botão imprimir */
+        .btn-print{
+            display:inline-flex;align-items:center;gap:8px;
+            padding:9px 16px;border-radius:12px;
+            border:1px solid var(--line);background:#fff;
+            font-weight:800;font-size:13px;cursor:pointer;
+        }
+        .btn-print:hover{background:#f3f4f6;}
+
+        /* ===== PRINT ===== */
+        @media print {
+            .sidebar, .topbar, .toolbar, .tipo-cards, .right, .menu, script { display:none !important; }
+            body { background:#fff !important; }
+            .main { display:block !important; }
+            .app { display:block !important; }
+            .content { padding:0 !important; }
+            .panel { padding:0 !important; box-shadow:none !important; border:none !important; }
+            table { width:100%; border-collapse:collapse; }
+            thead th { font-size:11px; color:#444; border-bottom:2px solid #111; padding:8px 6px; text-align:left; }
+            tbody td { font-size:12px; padding:7px 6px; border-bottom:1px solid #ddd; }
+            .badge { border:1px solid #ccc; padding:2px 8px; border-radius:999px; font-size:11px; }
+            .badge-dark { background:#111 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+            .print-header { display:block !important; }
+            .toprow { display:none !important; }
+        }
+        .print-header { display:none; }
         .tipo-card{
             flex:1;min-width:160px;
             border:2px solid var(--line);border-radius:16px;
@@ -204,11 +231,34 @@ require_once __DIR__ . '/includes/layout_top.php';
         .tipo-card .tc-clear{font-size:11px;font-weight:700;margin-top:6px;text-decoration:underline;opacity:.6;}
     </style>
 
+    <!-- Cabeçalho visível apenas na impressão -->
+    <div class="print-header" style="margin-bottom:18px;">
+        <div style="font-size:20px;font-weight:900;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:4px;">
+            Fila de Demandas
+        </div>
+        <div style="font-size:12px;color:#555;margin-bottom:4px;">
+            Responsável: <?= h($u['nome']) ?> &nbsp;|&nbsp; Gerado em: <?= date('d/m/Y H:i') ?>
+        </div>
+        <?php
+        $filtros = array();
+        if ($q !== '')                                         $filtros[] = 'Busca: "' . $q . '"';
+        if ($status !== 'todos')                               $filtros[] = 'Status: ' . labelStatusDem($status);
+        if ($crit !== 'todos')                                 $filtros[] = 'Criticidade: ' . labelCritDem($crit);
+        if ($ftipo !== '' && in_array($ftipo, $allowedTipos, true)) $filtros[] = 'Tipo: ' . labelTipoDem($ftipo);
+        if (!empty($filtros)):
+        ?>
+        <div style="font-size:12px;color:#555;">Filtros: <?= h(implode(' · ', $filtros)) ?></div>
+        <?php endif; ?>
+    </div>
+
     <div class="toprow">
         <div class="title">
             <h1>Fila de Demandas</h1>
             <div class="sub">Tudo que está atribuído a você como responsável</div>
         </div>
+        <button class="btn-print" onclick="window.print()" title="Imprimir lista atual">
+            🖨️ Imprimir
+        </button>
     </div>
 
     <?php
@@ -264,13 +314,16 @@ require_once __DIR__ . '/includes/layout_top.php';
             </form>
         </div>
 
-        <div style="font-weight:900;font-size:15px;margin-bottom:10px;">
+        <div style="font-weight:900;font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:12px;">
             Minhas Demandas
             <?php if ($ftipo !== '' && in_array($ftipo, $allowedTipos, true)): ?>
-                <span style="font-size:12px;font-weight:700;color:var(--muted);margin-left:8px;">
+                <span style="font-size:12px;font-weight:700;color:var(--muted);">
                     — <?= h(labelTipoDem($ftipo)) ?> · do mais antigo ao mais novo
                 </span>
             <?php endif; ?>
+            <span style="font-size:12px;font-weight:700;color:var(--muted);margin-left:auto;">
+                <?= count($linhas) ?> item(s)
+            </span>
         </div>
 
         <?php if (!empty($linhas)): ?>
